@@ -5,11 +5,31 @@
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
-        "type": "string",
-        "required": true,
-        "default": "Example Dynamic Platform"
+      "devices": {
+        "name": "Devices",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "name": "Name",
+              "type": "string"
+            },
+            "ip": {
+              "name": "IP",
+              "type": "string",
+              "format": "ipv4"
+            },
+            "enabled": {
+              "name": "Enabled",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "ip"
+          ]
+        }
       }
     }
   }
