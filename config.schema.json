@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "http-lights",
   "pluginType": "platform",
   "singular": true,
   "schema": {
