@@ -1,7 +1,7 @@
 import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { ExamplePlatformAccessory } from './platformAccessory.js';
+import { HttpLightAccessory } from './platformAccessory.js';
 
 export class HttpLights implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
@@ -12,7 +12,9 @@ export class HttpLights implements DynamicPlatformPlugin {
 
   constructor(
     public readonly log: Logging,
-    public readonly config: PlatformConfig & { devices?: { name: string, ip: string, enabled: boolean }[] },
+    public readonly config: PlatformConfig & {
+      devices?: { name: string; ip: string; enabled: boolean }[]; pollInterval?: number; timeout?: number;
+    },
     public readonly api: API,
   ) {
     this.Service = api.hap.Service;
@@ -58,12 +60,12 @@ export class HttpLights implements DynamicPlatformPlugin {
     const devices = (this.config.devices || []).filter(d => d.enabled);
 
     this.accessories.forEach(accessory => {
-      const isConfigured = devices.some(device => device.name === accessory.displayName)
+      const isConfigured = devices.some(device => device.name === accessory.displayName);
       if (!isConfigured) {
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
         this.log.info('Removing obsolete accessory:', accessory.displayName);
       }
-    })
+    });
 
 
     // loop over the discovered devices and register each one if it has not already been registered
@@ -88,7 +90,7 @@ export class HttpLights implements DynamicPlatformPlugin {
 
         // create the accessory handler for the restored accessory
         // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, existingAccessory);
+        new HttpLightAccessory(this, existingAccessory);
 
         // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
         // remove platform accessories when no longer present
@@ -107,7 +109,7 @@ export class HttpLights implements DynamicPlatformPlugin {
 
         // create the accessory handler for the newly create accessory
         // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, accessory);
+        new HttpLightAccessory(this, accessory);
 
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);

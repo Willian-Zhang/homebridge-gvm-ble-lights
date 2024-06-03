@@ -2,22 +2,17 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { HttpLights } from './platform.js';
 
-/**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
- */
-export class ExamplePlatformAccessory {
+export class HttpLightAccessory {
   private service: Service;
-  private ip: string;
-
+  private url: string;
 
   constructor(
     private readonly platform: HttpLights,
     private readonly accessory: PlatformAccessory,
   ) {
 
-    this.ip = this.accessory.context.device.ip
+    this.url = `http://${this.accessory.context.device.ip}/`;
+
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
@@ -37,18 +32,32 @@ export class ExamplePlatformAccessory {
       .onSet(this.setBrightness.bind(this))
       .onGet(this.getBrightness.bind(this));
 
+    setInterval(() => {
+      fetch(this.url, {
+        signal: AbortSignal.timeout(800),
+      })
+        .then(res => res.json())
+        .then(res => {
+          const { on, brightness } = res;
+          this.service.updateCharacteristic(this.platform.Characteristic.On, on);
+          this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
+        })
+        .catch(e => this.platform.log.error(this.accessory.displayName, 'Error polling device updates', e));
+    }, 2000); // TODO read interval from settings
+
   }
 
   async setOn(value: CharacteristicValue) {
-    const url = `http://${this.ip}/light/${value ? 'on' : 'off'}`
-    // const url = `http://${this.ip}/setState?type=switch&value=${value ? '1' : '0'}`
-
     try {
-      await fetch(url, {
-        signal: AbortSignal.timeout(500)
-      })
-      this.platform.log.info(this.accessory.displayName, 'Set Characteristic On ->', value);
-
+      await fetch(this.url, {
+        signal: AbortSignal.timeout(800), //TODO read timeout from context
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ on: value }),
+      });
+      this.platform.log.debug(this.accessory.displayName, 'Set Characteristic On ->', value);
     } catch (e) {
       this.platform.log.error(this.accessory.displayName, 'Set Characteristic On Error:', e);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -56,17 +65,13 @@ export class ExamplePlatformAccessory {
   }
 
   async getOn(): Promise<CharacteristicValue> {
-    const url = `http://${this.ip}/light/status`
-
     try {
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(500)
-      })
-      const val = await res.text()
-      const isOn = val === "1"
-      this.platform.log.info(this.accessory.displayName, 'Get Characteristic On ->', isOn);
-
-      return isOn;
+      const res = await fetch(this.url, {
+        signal: AbortSignal.timeout(800),
+      });
+      const { on } = await res.json();
+      this.platform.log.debug(this.accessory.displayName, 'Get Characteristic On ->', on);
+      return on;
     } catch (e) {
       this.platform.log.error(this.accessory.displayName, 'Get Characteristic On Error:', e);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -74,12 +79,16 @@ export class ExamplePlatformAccessory {
   }
 
   async setBrightness(value: CharacteristicValue) {
-    const url = `http://${this.ip}/light/brightness?value=${value}`
-    this.platform.log.info(this.accessory.displayName, 'Set Characteristic Brightness', url);
     try {
-      await fetch(url, {
-        signal: AbortSignal.timeout(500)
-      })
+      await fetch(this.url, {
+        signal: AbortSignal.timeout(800),
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ brightness: value }),
+      });
+      this.platform.log.debug(this.accessory.displayName, 'Set Characteristic Brightness', value);
     } catch (e) {
       this.platform.log.error(this.accessory.displayName, 'Set Characteristic Brightness Error:', e);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -87,16 +96,13 @@ export class ExamplePlatformAccessory {
   }
 
   async getBrightness(): Promise<CharacteristicValue> {
-    const url = `http://${this.ip}/light/brightness_value`
-
     try {
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(500)
-      })
-      const val = await res.text()
-      this.platform.log.info(this.accessory.displayName, 'Get Characteristic Brightness ->', val);
-
-      return val
+      const res = await fetch(this.url, {
+        signal: AbortSignal.timeout(800),
+      });
+      const { brightness } = await res.json();
+      this.platform.log.debug(this.accessory.displayName, 'Get Characteristic Brightness ->', brightness);
+      return brightness;
     } catch (e) {
       this.platform.log.error(this.accessory.displayName, 'Get Characteristic Brightness Error:', e);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
