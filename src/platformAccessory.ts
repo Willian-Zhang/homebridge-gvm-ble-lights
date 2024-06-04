@@ -2,16 +2,22 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { HttpLights } from './platform.js';
 
+export interface HttpLightAccessoryConfig {
+  url: string;
+  timeout: number;
+  pollInterval: number;
+}
+
 export class HttpLightAccessory {
   private service: Service;
-  private url: string;
 
   constructor(
     private readonly platform: HttpLights,
     private readonly accessory: PlatformAccessory,
+    private readonly config: HttpLightAccessoryConfig,
   ) {
 
-    this.url = `http://${this.accessory.context.device.ip}/`;
+    this.platform.log.info(`Initializing accessory ${this.accessory.displayName} with config ${JSON.stringify(config)}`);
 
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
@@ -24,8 +30,8 @@ export class HttpLightAccessory {
 
     // register handlers for the On/Off Characteristic
     this.service.getCharacteristic(this.platform.Characteristic.On)
-      .onSet(this.setOn.bind(this))                // SET - bind to the `setOn` method below
-      .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
+      .onSet(this.setOn.bind(this))
+      .onGet(this.getOn.bind(this));
 
     // register handlers for the Brightness Characteristic
     this.service.getCharacteristic(this.platform.Characteristic.Brightness)
@@ -33,8 +39,8 @@ export class HttpLightAccessory {
       .onGet(this.getBrightness.bind(this));
 
     setInterval(() => {
-      fetch(this.url, {
-        signal: AbortSignal.timeout(800),
+      fetch(this.config.url, {
+        signal: AbortSignal.timeout(this.config.timeout),
       })
         .then(res => res.json())
         .then(res => {
@@ -43,14 +49,14 @@ export class HttpLightAccessory {
           this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
         })
         .catch(e => this.platform.log.error(this.accessory.displayName, 'Error polling device updates', e));
-    }, 2000); // TODO read interval from settings
+    }, this.config.pollInterval);
 
   }
 
   async setOn(value: CharacteristicValue) {
     try {
-      await fetch(this.url, {
-        signal: AbortSignal.timeout(800), //TODO read timeout from context
+      await fetch(this.config.url, {
+        signal: AbortSignal.timeout(this.config.timeout),
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -66,8 +72,8 @@ export class HttpLightAccessory {
 
   async getOn(): Promise<CharacteristicValue> {
     try {
-      const res = await fetch(this.url, {
-        signal: AbortSignal.timeout(800),
+      const res = await fetch(this.config.url, {
+        signal: AbortSignal.timeout(this.config.timeout),
       });
       const { on } = await res.json();
       this.platform.log.debug(this.accessory.displayName, 'Get Characteristic On ->', on);
@@ -80,8 +86,8 @@ export class HttpLightAccessory {
 
   async setBrightness(value: CharacteristicValue) {
     try {
-      await fetch(this.url, {
-        signal: AbortSignal.timeout(800),
+      await fetch(this.config.url, {
+        signal: AbortSignal.timeout(this.config.timeout),
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -97,8 +103,8 @@ export class HttpLightAccessory {
 
   async getBrightness(): Promise<CharacteristicValue> {
     try {
-      const res = await fetch(this.url, {
-        signal: AbortSignal.timeout(800),
+      const res = await fetch(this.config.url, {
+        signal: AbortSignal.timeout(this.config.timeout),
       });
       const { brightness } = await res.json();
       this.platform.log.debug(this.accessory.displayName, 'Get Characteristic Brightness ->', brightness);
