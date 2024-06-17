@@ -1,11 +1,13 @@
 import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
+import mqtt from "mqtt";
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { HttpLightAccessory, HttpLightAccessoryConfig } from './platformAccessory.js';
+import { HttpLightAccessory } from './platformAccessory.js';
 
 export class HttpLights implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
+  public readonly mqttClient: mqtt.MqttClient;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
@@ -19,6 +21,16 @@ export class HttpLights implements DynamicPlatformPlugin {
   ) {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
+    this.mqttClient = mqtt.connect("mqtt://192.168.1.86:30007");
+    this.mqttClient.on("connect", () => {
+      this.mqttClient.subscribe("devices", (err) => {
+        if (err) {
+          this.log.error('Error subscribing devices topic', err)
+        } else {
+          this.log.info('Subscribed to devices topic')
+        }
+      })
+    });
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
@@ -29,8 +41,23 @@ export class HttpLights implements DynamicPlatformPlugin {
     }
 
     this.api.on('didFinishLaunching', () => {
-      log.debug('Executed didFinishLaunching callback');
-      this.discoverDevices();
+      this.mqttClient.on('message', (topic, payload) => {
+        const msg = payload.toString()
+        // this.log.info(`Message from ${topic} - ${msg}`)
+
+        const { id, state } = JSON.parse(msg)
+        const uuid = this.api.hap.uuid.generate(id);
+        const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+
+        if (!existingAccessory) {
+          this.log.info('Adding new accessory:', id);
+          const accessory = new this.api.platformAccessory(id, uuid);
+          new HttpLightAccessory(this, accessory);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          this.accessories.push(accessory);
+        }
+      })
+      // this.discoverDevices();
     });
   }
 
@@ -40,43 +67,8 @@ export class HttpLights implements DynamicPlatformPlugin {
    */
   configureAccessory(accessory: PlatformAccessory) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
-
-    // add the restored accessory to the accessories cache, so we can track if it has already been registered
+    new HttpLightAccessory(this, accessory);
     this.accessories.push(accessory);
   }
 
-  discoverDevices() {
-
-    const devices = (this.config.devices || []).filter(d => d.enabled);
-
-    this.accessories.forEach(accessory => {
-      const isConfigured = devices.some(device => device.name === accessory.displayName);
-      if (!isConfigured) {
-        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-        this.log.info('Removing obsolete accessory:', accessory.displayName);
-      }
-    });
-
-    for (const device of devices) {
-
-      const deviceConfig: HttpLightAccessoryConfig = {
-        url: `http://${device.ip}/`,
-        timeout: this.config.timeout!,
-        pollInterval: this.config.pollInterval!,
-      };
-
-      const uuid = this.api.hap.uuid.generate(device.name);
-      const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-
-      if (existingAccessory) {
-        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-        new HttpLightAccessory(this, existingAccessory, deviceConfig);
-      } else {
-        this.log.info('Adding new accessory:', device.name);
-        const accessory = new this.api.platformAccessory(device.name, uuid);
-        new HttpLightAccessory(this, accessory, deviceConfig);
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-      }
-    }
-  }
 }

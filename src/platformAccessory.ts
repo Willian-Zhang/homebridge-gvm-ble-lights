@@ -2,22 +2,24 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { HttpLights } from './platform.js';
 
-export interface HttpLightAccessoryConfig {
-  url: string;
-  timeout: number;
-  pollInterval: number;
-}
-
 export class HttpLightAccessory {
   private service: Service;
+  private topic: string;
+
+  private on: boolean = false;
+  private brightness: number = 100;
 
   constructor(
     private readonly platform: HttpLights,
     private readonly accessory: PlatformAccessory,
-    private readonly config: HttpLightAccessoryConfig,
+    // private readonly config: HttpLightAccessoryConfig,
   ) {
 
-    this.platform.log.info(`Initializing accessory ${this.accessory.displayName} with config ${JSON.stringify(config)}`);
+    this.topic = 'devices/' + this.accessory.displayName
+    this.platform.log.info('Created accessory with topic', this.topic)
+
+
+    // this.platform.log.info(`Initializing accessory ${this.accessory.displayName} with config ${JSON.stringify(config)}`);
 
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
@@ -26,7 +28,7 @@ export class HttpLightAccessory {
 
     // set the service name, this is what is displayed as the default name on the Home app
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
+    // this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
 
     // register handlers for the On/Off Characteristic
     this.service.getCharacteristic(this.platform.Characteristic.On)
@@ -38,81 +40,39 @@ export class HttpLightAccessory {
       .onSet(this.setBrightness.bind(this))
       .onGet(this.getBrightness.bind(this));
 
-    setInterval(() => {
-      fetch(this.config.url, {
-        signal: AbortSignal.timeout(this.config.timeout),
-      })
-        .then(res => res.json())
-        .then(res => {
-          const { on, brightness } = res;
+    this.platform.mqttClient.on('message', (topic, payload) => {
+      if (topic === 'devices') {
+        const { id, state } = JSON.parse(payload.toString())
+        if (id === this.accessory.displayName) {
+          const { on, brightness } = state;
+          this.on = on;
+          this.brightness = brightness;
           this.service.updateCharacteristic(this.platform.Characteristic.On, on);
           this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
-        })
-        .catch(e => this.platform.log.error(this.accessory.displayName, 'Error polling device updates', e));
-    }, this.config.pollInterval);
+        }
+      }
+    })
+  }
 
+  updateState(on: boolean, brightness: number) {
+    this.service.updateCharacteristic(this.platform.Characteristic.On, on);
+    this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
   }
 
   async setOn(value: CharacteristicValue) {
-    try {
-      await fetch(this.config.url, {
-        signal: AbortSignal.timeout(this.config.timeout),
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ on: value }),
-      });
-      this.platform.log.debug(this.accessory.displayName, 'Set Characteristic On ->', value);
-    } catch (e) {
-      this.platform.log.error(this.accessory.displayName, 'Set Characteristic On Error:', e);
-      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-    }
+    this.platform.mqttClient.publish(this.topic, JSON.stringify({ on: value }))
   }
 
   async getOn(): Promise<CharacteristicValue> {
-    try {
-      const res = await fetch(this.config.url, {
-        signal: AbortSignal.timeout(this.config.timeout),
-      });
-      const { on } = await res.json();
-      this.platform.log.debug(this.accessory.displayName, 'Get Characteristic On ->', on);
-      return on;
-    } catch (e) {
-      this.platform.log.error(this.accessory.displayName, 'Get Characteristic On Error:', e);
-      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-    }
+    return this.on
   }
 
   async setBrightness(value: CharacteristicValue) {
-    try {
-      await fetch(this.config.url, {
-        signal: AbortSignal.timeout(this.config.timeout),
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ brightness: value }),
-      });
-      this.platform.log.debug(this.accessory.displayName, 'Set Characteristic Brightness', value);
-    } catch (e) {
-      this.platform.log.error(this.accessory.displayName, 'Set Characteristic Brightness Error:', e);
-      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-    }
+    this.platform.mqttClient.publish(this.topic, JSON.stringify({ brightness: value }))
   }
 
   async getBrightness(): Promise<CharacteristicValue> {
-    try {
-      const res = await fetch(this.config.url, {
-        signal: AbortSignal.timeout(this.config.timeout),
-      });
-      const { brightness } = await res.json();
-      this.platform.log.debug(this.accessory.displayName, 'Get Characteristic Brightness ->', brightness);
-      return brightness;
-    } catch (e) {
-      this.platform.log.error(this.accessory.displayName, 'Get Characteristic Brightness Error:', e);
-      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-    }
+    return this.brightness
   }
 
 }
