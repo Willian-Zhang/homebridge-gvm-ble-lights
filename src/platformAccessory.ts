@@ -1,26 +1,58 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { HttpLights } from './platform.js';
+import { Characteristic, Peripheral, ServicesAndCharacteristics } from '@abandonware/noble';
 
 export class HttpLightAccessory {
   private service: Service;
-  private topic: string;
 
   private on: boolean = false;
   private brightness: number = 100;
 
+  private set_on_characteristic: Characteristic | undefined;
+  private set_brightness_characteristic: Characteristic | undefined;
+
   constructor(
     private readonly platform: HttpLights,
     private readonly accessory: PlatformAccessory,
-    // private readonly config: HttpLightAccessoryConfig,
+    private readonly peripheral: Peripheral
   ) {
 
-    this.topic = 'devices/' + this.accessory.displayName
-    this.platform.log.info('Created accessory with topic', this.topic)
+    const on_characteristic_uuid = 'd00b8ba4d8ce42ff92f2b0d193c58da4'
+    const set_on_characteristic_uuid = '19380250824b46c797a979761b8a27a7'
+    const brightness_characteristic_uuid = '127cf8c9b7fe47e3b2e03901b7988b00'
+    const set_brightness_characteristic_uuid = '66286dbfe5e946d4b300a0ec456f677c'
+
+    peripheral.connectAsync()
+      .then(() => peripheral.discoverAllServicesAndCharacteristicsAsync())
+      .then(({ characteristics }: ServicesAndCharacteristics) => {
+        this.set_on_characteristic = characteristics.find(chr => chr.uuid === set_on_characteristic_uuid)
+        this.set_brightness_characteristic = characteristics.find(chr => chr.uuid === set_brightness_characteristic_uuid)
+
+        const on_characteristic = characteristics.find(chr => chr.uuid === on_characteristic_uuid)
+        if (on_characteristic) {
+          on_characteristic.subscribe()
+          on_characteristic.on('data', buff => {
+            const on = buff.readInt8() === 1
+            this.on = on;
+            this.platform.log.debug('received on update', this.peripheral.id, on)
+            this.service.updateCharacteristic(this.platform.Characteristic.On, on);
+          })
+        }
+
+        const brightness_characteristic = characteristics.find(chr => chr.uuid === brightness_characteristic_uuid)
+        if (brightness_characteristic) {
+          brightness_characteristic.subscribe()
+          brightness_characteristic.on('data', buff => {
+            const brightness = buff.readInt8();
+            this.brightness = brightness;
+            this.platform.log.debug('received brightness update', this.peripheral.id, brightness)
+            this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
+           });
+        }
 
 
-    // this.platform.log.info(`Initializing accessory ${this.accessory.displayName} with config ${JSON.stringify(config)}`);
-
+      });
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
@@ -39,19 +71,6 @@ export class HttpLightAccessory {
     this.service.getCharacteristic(this.platform.Characteristic.Brightness)
       .onSet(this.setBrightness.bind(this))
       .onGet(this.getBrightness.bind(this));
-
-    this.platform.mqttClient.on('message', (topic, payload) => {
-      if (topic === 'devices') {
-        const { id, state } = JSON.parse(payload.toString())
-        if (id === this.accessory.displayName) {
-          const { on, brightness } = state;
-          this.on = on;
-          this.brightness = brightness;
-          this.service.updateCharacteristic(this.platform.Characteristic.On, on);
-          this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
-        }
-      }
-    })
   }
 
   updateState(on: boolean, brightness: number) {
@@ -60,7 +79,11 @@ export class HttpLightAccessory {
   }
 
   async setOn(value: CharacteristicValue) {
-    this.platform.mqttClient.publish(this.topic, JSON.stringify({ on: value }))
+    if (this.set_on_characteristic) {
+      const buff = Buffer.alloc(1)
+      buff.writeInt8(value as number, 0)
+      await this.set_on_characteristic.writeAsync(buff, false)
+    }
   }
 
   async getOn(): Promise<CharacteristicValue> {
@@ -68,7 +91,11 @@ export class HttpLightAccessory {
   }
 
   async setBrightness(value: CharacteristicValue) {
-    this.platform.mqttClient.publish(this.topic, JSON.stringify({ brightness: value }))
+    if (this.set_brightness_characteristic) {
+      const buff = Buffer.alloc(1)
+      buff.writeInt8(value as number, 0)
+      await this.set_brightness_characteristic.writeAsync(buff, false)
+    }
   }
 
   async getBrightness(): Promise<CharacteristicValue> {

@@ -40,6 +40,6 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
-    "mqtt": "^5.7.0"
+    "@abandonware/noble": "^1.9.2-25"
   }
 }

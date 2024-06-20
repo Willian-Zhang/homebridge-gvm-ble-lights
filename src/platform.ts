@@ -1,5 +1,5 @@
 import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
-import mqtt from "mqtt";
+import noble, { Peripheral } from '@abandonware/noble';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { HttpLightAccessory } from './platformAccessory.js';
@@ -7,7 +7,6 @@ import { HttpLightAccessory } from './platformAccessory.js';
 export class HttpLights implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
-  public readonly mqttClient: mqtt.MqttClient;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
@@ -21,15 +20,12 @@ export class HttpLights implements DynamicPlatformPlugin {
   ) {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
-    this.mqttClient = mqtt.connect("mqtt://192.168.1.86:30007");
-    this.mqttClient.on("connect", () => {
-      this.mqttClient.subscribe("devices", (err) => {
-        if (err) {
-          this.log.error('Error subscribing devices topic', err)
-        } else {
-          this.log.info('Subscribed to devices topic')
-        }
-      })
+
+    const service_uuid = 'cad6e164de14425f8d19f241b592a385'
+    noble.on('stateChange', async (state: string) => {
+      if (state === 'poweredOn') {
+        await noble.startScanningAsync([service_uuid], false);
+      }
     });
 
     this.log.debug('Finished initializing platform:', this.config.name);
@@ -41,23 +37,25 @@ export class HttpLights implements DynamicPlatformPlugin {
     }
 
     this.api.on('didFinishLaunching', () => {
-      this.mqttClient.on('message', (topic, payload) => {
-        const msg = payload.toString()
-        // this.log.info(`Message from ${topic} - ${msg}`)
-
-        const { id, state } = JSON.parse(msg)
+      this.log.info('finished launching')
+      noble.on('discover', async (peripheral: Peripheral) => {
+        const { id } = peripheral;
         const uuid = this.api.hap.uuid.generate(id);
+        this.log.info('discovered peripherial', peripheral.id)
         const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
         if (!existingAccessory) {
-          this.log.info('Adding new accessory:', id);
-          const accessory = new this.api.platformAccessory(id, uuid);
-          new HttpLightAccessory(this, accessory);
-          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-          this.accessories.push(accessory);
+              this.log.info('Adding new accessory:', uuid);
+              const accessory = new this.api.platformAccessory(id, uuid);
+              new HttpLightAccessory(this, accessory, peripheral);
+              this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+              this.accessories.push(accessory);
+        }else {
+          //TODO it can create duplicated instance if peripheral is discovered again - check if instance exists!
+          new HttpLightAccessory(this, existingAccessory, peripheral);
         }
+
       })
-      // this.discoverDevices();
     });
   }
 
@@ -67,7 +65,6 @@ export class HttpLights implements DynamicPlatformPlugin {
    */
   configureAccessory(accessory: PlatformAccessory) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
-    new HttpLightAccessory(this, accessory);
     this.accessories.push(accessory);
   }
 
