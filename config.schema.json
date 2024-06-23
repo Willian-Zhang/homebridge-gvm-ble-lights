@@ -1,50 +1,6 @@
 {
-  "pluginAlias": "http-lights",
+  "pluginAlias": "ble-lights",
   "pluginType": "platform",
   "singular": true,
-  "schema": {
-    "type": "object",
-    "properties": {
-      "devices": {
-        "name": "Devices",
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "name": "Name",
-              "type": "string"
-            },
-            "ip": {
-              "name": "IP",
-              "type": "string",
-              "format": "ipv4"
-            },
-            "enabled": {
-              "name": "Enabled",
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "name",
-            "ip"
-          ]
-        }
-      },
-      "timeout": {
-        "name": "Timeout",
-        "description": "Timeout in milliseconds applied to every http request",
-        "type": "number",
-        "default": "500",
-        "required": true
-      },
-      "pollInterval": {
-        "name": "Poll interval",
-        "description": "Device status poll interval in milliseconds",
-        "type": "number",
-        "default": "1000",
-        "required": true
-      }
-    }
-  }
+  "schema": {}
 }

@@ -1,17 +1,16 @@
 {
-  "private": true,
-  "displayName": "Http lights",
-  "name": "homebridge-http-lights",
+  "displayName": "BLE lights",
+  "name": "homebridge-ble-lights",
   "version": "1.0.0",
   "description": "A short description about what your plugin does.",
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git://github.com/kszpakowski/homebridge-http-lights.git"
+    "url": "git://github.com/kszpakowski/homebridge-ble-lights.git"
   },
   "bugs": {
-    "url": "https://github.com/kszpakowski/homebridge-http-lights/issues"
+    "url": "https://github.com/kszpakowski/homebridge-ble-lights/issues"
   },
   "engines": {
     "node": "^18.17.0 || ^20.9.0",

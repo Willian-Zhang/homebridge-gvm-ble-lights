@@ -2,9 +2,9 @@ import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig,
 import noble, { Peripheral } from '@abandonware/noble';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { HttpLightAccessory } from './platformAccessory.js';
+import { BleLightAccessory } from './platformAccessory.js';
 
-export class HttpLights implements DynamicPlatformPlugin {
+export class BleLights implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
 
@@ -21,7 +21,7 @@ export class HttpLights implements DynamicPlatformPlugin {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
 
-    const service_uuid = 'cad6e164de14425f8d19f241b592a385'
+    const service_uuid = 'cad6e164de14425f8d19f241b592a385';
     noble.on('stateChange', async (state: string) => {
       if (state === 'poweredOn') {
         await noble.startScanningAsync([service_uuid], false);
@@ -37,25 +37,25 @@ export class HttpLights implements DynamicPlatformPlugin {
     }
 
     this.api.on('didFinishLaunching', () => {
-      this.log.info('finished launching')
+      this.log.info('finished launching');
       noble.on('discover', async (peripheral: Peripheral) => {
         const { id } = peripheral;
         const uuid = this.api.hap.uuid.generate(id);
-        this.log.info('discovered peripherial', peripheral.id)
+        this.log.info('discovered peripherial', peripheral.id);
         const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
         if (!existingAccessory) {
-              this.log.info('Adding new accessory:', uuid);
-              const accessory = new this.api.platformAccessory(id, uuid);
-              new HttpLightAccessory(this, accessory, peripheral);
-              this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-              this.accessories.push(accessory);
+          this.log.info('Adding new accessory:', uuid);
+          const accessory = new this.api.platformAccessory(id, uuid);
+          new BleLightAccessory(this, accessory, peripheral);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          this.accessories.push(accessory);
         }else {
           //TODO it can create duplicated instance if peripheral is discovered again - check if instance exists!
-          new HttpLightAccessory(this, existingAccessory, peripheral);
+          new BleLightAccessory(this, existingAccessory, peripheral);
         }
 
-      })
+      });
     });
   }
 
