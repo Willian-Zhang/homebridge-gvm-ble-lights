@@ -31,6 +31,7 @@ export class BleLightAccessory {
         this.set_on_characteristic = characteristics.find(chr => chr.uuid === set_on_characteristic_uuid);
         this.set_brightness_characteristic = characteristics.find(chr => chr.uuid === set_brightness_characteristic_uuid);
 
+        /*
         const on_characteristic = characteristics.find(chr => chr.uuid === on_characteristic_uuid);
         if (on_characteristic) {
           on_characteristic.subscribe();
@@ -54,7 +55,7 @@ export class BleLightAccessory {
             this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
           });
         }
-
+        */
 
       });
 
