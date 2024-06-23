@@ -37,7 +37,7 @@ export class BleLightAccessory {
           on_characteristic.on('data', buff => {
             const on = buff.readInt8() === 1;
             this.on = on;
-            this.platform.log.debug('received on update', this.peripheral.id, on);
+            this.platform.log.info('received on update', this.peripheral.id, on);
             this.service.updateCharacteristic(this.platform.Characteristic.On, on);
           });
         }
@@ -49,7 +49,7 @@ export class BleLightAccessory {
           brightness_characteristic.on('data', buff => {
             const brightness = buff.readInt8();
             this.brightness = brightness;
-            this.platform.log.debug('received brightness update', this.peripheral.id, brightness);
+            this.platform.log.info('received brightness update', this.peripheral.id, brightness);
             this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
           });
         }
@@ -83,6 +83,7 @@ export class BleLightAccessory {
 
   async setOn(value: CharacteristicValue) {
     if (this.set_on_characteristic) {
+      this.platform.log.info('Setting charasterictic on', value);
       const buff = Buffer.alloc(1);
       buff.writeInt8(value as number, 0);
       await this.set_on_characteristic.writeAsync(buff, false);
@@ -95,6 +96,7 @@ export class BleLightAccessory {
 
   async setBrightness(value: CharacteristicValue) {
     if (this.set_brightness_characteristic) {
+      this.platform.log.info('Setting charasterictic brightess', value);
       const buff = Buffer.alloc(1);
       buff.writeInt8(value as number, 0);
       await this.set_brightness_characteristic.writeAsync(buff, false);
