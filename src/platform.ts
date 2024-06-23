@@ -40,7 +40,6 @@ export class BleLights implements DynamicPlatformPlugin {
       this.log.info('finished launching');
       noble.on('discover', async (peripheral: Peripheral) => {
         this.log.info('Discovered peripherial', peripheral.id);
-        await noble.stopScanningAsync();
         const { id } = peripheral;
         const uuid = this.api.hap.uuid.generate(id);
         const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
