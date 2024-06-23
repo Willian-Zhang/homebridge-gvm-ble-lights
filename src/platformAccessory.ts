@@ -18,9 +18,9 @@ export class BleLightAccessory {
     private readonly peripheral: Peripheral,
   ) {
 
-    const on_characteristic_uuid = 'd00b8ba4d8ce42ff92f2b0d193c58da4';
+    // const on_characteristic_uuid = 'd00b8ba4d8ce42ff92f2b0d193c58da4';
     const set_on_characteristic_uuid = '19380250824b46c797a979761b8a27a7';
-    const brightness_characteristic_uuid = '127cf8c9b7fe47e3b2e03901b7988b00';
+    // const brightness_characteristic_uuid = '127cf8c9b7fe47e3b2e03901b7988b00';
     const set_brightness_characteristic_uuid = '66286dbfe5e946d4b300a0ec456f677c';
 
     peripheral.connectAsync()
