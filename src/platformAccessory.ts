@@ -24,7 +24,7 @@ export class BleLightAccessory {
     const set_brightness_characteristic_uuid = '66286dbfe5e946d4b300a0ec456f677c';
 
     peripheral.connectAsync()
-      .then(() => this.platform.log.info("Peripheral connected", peripheral.id))
+      .then(() => this.platform.log.info('Peripheral connected', peripheral.id))
       .then(() => peripheral.discoverAllServicesAndCharacteristicsAsync())
       .then(({ characteristics }: ServicesAndCharacteristics) => {
         this.set_on_characteristic = characteristics.find(chr => chr.uuid === set_on_characteristic_uuid);
@@ -33,7 +33,7 @@ export class BleLightAccessory {
         const on_characteristic = characteristics.find(chr => chr.uuid === on_characteristic_uuid);
         if (on_characteristic) {
           on_characteristic.subscribe();
-          this.platform.log.info('Subscribed to peripheral "on" characterisitic', peripheral.id)
+          this.platform.log.info('Subscribed to peripheral "on" characterisitic', peripheral.id);
           on_characteristic.on('data', buff => {
             const on = buff.readInt8() === 1;
             this.on = on;
@@ -45,7 +45,7 @@ export class BleLightAccessory {
         const brightness_characteristic = characteristics.find(chr => chr.uuid === brightness_characteristic_uuid);
         if (brightness_characteristic) {
           brightness_characteristic.subscribe();
-          this.platform.log.info('Subscribed to peripheral "brightness" characterisitic', peripheral.id)
+          this.platform.log.info('Subscribed to peripheral "brightness" characterisitic', peripheral.id);
           brightness_characteristic.on('data', buff => {
             const brightness = buff.readInt8();
             this.brightness = brightness;
