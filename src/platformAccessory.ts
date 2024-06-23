@@ -27,7 +27,7 @@ export class BleLightAccessory {
       .then(() => this.platform.log.info('Peripheral connected', peripheral.id))
       .then(() => peripheral.discoverAllServicesAndCharacteristicsAsync())
       .then(({ characteristics }: ServicesAndCharacteristics) => {
-        this.platform.log.info('Configuring discovered characteristics', peripheral.id)
+        this.platform.log.info('Configuring discovered characteristics', peripheral.id);
         this.set_on_characteristic = characteristics.find(chr => chr.uuid === set_on_characteristic_uuid);
         this.set_brightness_characteristic = characteristics.find(chr => chr.uuid === set_brightness_characteristic_uuid);
 
