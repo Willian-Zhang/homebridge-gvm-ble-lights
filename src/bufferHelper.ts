@@ -33,7 +33,7 @@ export function temprature(value: number) {
 }
 
 export function start_with(buffer: Buffer, check_buffer: Buffer) {
-    let len = check_buffer.length;
+    const len = check_buffer.length;
     if (buffer.length < len) {
         return false;
     }
@@ -44,6 +44,6 @@ export function start_with(buffer: Buffer, check_buffer: Buffer) {
 }
 export function infoAll(){
     const cmd = Buffer.from([0x4C ,0x54 ,0x09 ,0x00 ,0x00 ,0x53 ,0x00 ,0x00 ,0x01 ,0x00]);
-    let crc = CRCBuffer(cmd);
+    const crc = CRCBuffer(cmd);
     return Buffer.concat([cmd, crc]);
 }

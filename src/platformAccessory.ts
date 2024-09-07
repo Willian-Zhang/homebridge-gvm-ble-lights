@@ -159,11 +159,11 @@ export class GVMBleLightAccessory {
     }
   }
   async sendValue(buffer_func: (value: number) => Buffer, value: CharacteristicValue){
-    let buff = buffer_func(value as number);
+    const buff = buffer_func(value as number);
     return await this.sendBuffer(buff);
   }
   async sendTemprature(value: CharacteristicValue){
-    let buff = temprature(10_000 / (value as number));
+    const buff = temprature(10_000 / (value as number));
     return await this.sendBuffer(buff);
   }
 
