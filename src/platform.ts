@@ -23,12 +23,15 @@ export class BleLights implements DynamicPlatformPlugin {
 
     const service_uuid = '1812';
     noble.on('stateChange', async (state: string) => {
+      this.log.debug('Noble state changed to:', state);
       if (state === 'poweredOn') {
         await noble.startScanningAsync([service_uuid], false);
+      }else if (state === 'unauthorized') {
+        this.log.error('BLE device not authorized, try add this app to the whitelist');
       }
     });
 
-    this.log.debug('Finished initializing platform:', this.config.name);
+    this.log.debug('Finished initializing platform.');
 
     // Homebridge 1.8.0 introduced a `log.success` method that can be used to log success messages
     // For users that are on a version prior to 1.8.0, we need a 'polyfill' for this method
