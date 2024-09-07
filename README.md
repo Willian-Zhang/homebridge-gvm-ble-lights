@@ -33,6 +33,15 @@ exapmle:
 },
 ```
 
+- whitelist node for BLE accesss
+  - macOS:
+    - head to Preferences -> Security & Privacy -> Privacy -> Bluetooth
+    - add node to the whitelist
+  - linux:
+    - TODO: explain how to whitelist node
+  - windows: 
+    - TODO: find a guide
+
 <span align="center">
 
 # Homebridge Platform Plugin Template
