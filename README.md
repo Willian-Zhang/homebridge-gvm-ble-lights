@@ -4,6 +4,25 @@
 
 </p>
 
+# GVM BLE (Bluetooth) Lights Plugin for Homebridge
+
+## Supported Features
+- Turn on/off the light
+- Set the brightness of the light
+- Set the color temperature of the light
+
+## Not Supported Features
+- Channel control (I have got only one channel light, so I can't test this feature)
+- Scene control
+
+## Known Issues
+- Some communication issues with the light is still unknown
+  
+## Usage
+- identify the id of your light, put it in the config file
+- or you have only one BLE light named `BT_LED`, you can use the default config file
+
+
 <span align="center">
 
 # Homebridge Platform Plugin Template

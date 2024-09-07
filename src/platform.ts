@@ -2,7 +2,7 @@ import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig,
 import noble, { Peripheral } from '@abandonware/noble';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { BleLightAccessory } from './platformAccessory.js';
+import { GVMBleLightAccessory } from './platformAccessory.js';
 
 export class BleLights implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
@@ -14,14 +14,14 @@ export class BleLights implements DynamicPlatformPlugin {
   constructor(
     public readonly log: Logging,
     public readonly config: PlatformConfig & {
-      devices?: { name: string; ip: string; enabled: boolean }[]; pollInterval?: number; timeout?: number;
+      devices?: { name: string; id?:string }[]; pollInterval?: number; timeout?: number;
     },
     public readonly api: API,
   ) {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
 
-    const service_uuid = 'cad6e164de14425f8d19f241b592a385';
+    const service_uuid = '1812';
     noble.on('stateChange', async (state: string) => {
       if (state === 'poweredOn') {
         await noble.startScanningAsync([service_uuid], false);
@@ -38,7 +38,20 @@ export class BleLights implements DynamicPlatformPlugin {
 
     this.api.on('didFinishLaunching', () => {
       this.log.info('finished launching');
+      const wait_for_finding_devices = new Set();
+      for (const device of this.config.devices || []) {
+        wait_for_finding_devices.add(device.id);
+      }
+      const found_devices = new Set();
       noble.on('discover', async (peripheral: Peripheral) => {
+        if (!this.config.devices?.at(0)?.id && peripheral.advertisement.localName !== 'BT_LED') {
+          this.log.debug('Ignoring peripheral', peripheral.id, peripheral.advertisement.localName);
+          return;
+        }
+        if (found_devices.has(peripheral.id)) {
+          this.log.info('Ignoring already found peripheral', peripheral.id);
+          return;
+        }
         this.log.info('Discovered peripherial', peripheral.id);
         const { id } = peripheral;
         const uuid = this.api.hap.uuid.generate(id);
@@ -47,14 +60,19 @@ export class BleLights implements DynamicPlatformPlugin {
         if (!existingAccessory) {
           this.log.info('Adding new accessory:', uuid);
           const accessory = new this.api.platformAccessory(id, uuid);
-          new BleLightAccessory(this, accessory, peripheral);
+          new GVMBleLightAccessory(this, accessory, peripheral);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
           this.accessories.push(accessory);
         }else {
-          //TODO it can create duplicated instance if peripheral is discovered again - check if instance exists!
-          new BleLightAccessory(this, existingAccessory, peripheral);
+          new GVMBleLightAccessory(this, existingAccessory, peripheral);
         }
-
+        found_devices.add(id);
+        wait_for_finding_devices.delete(id);
+        if (wait_for_finding_devices.size === 0) {
+          noble.stopScanning();
+        }else {
+          this.log.debug('Still waiting for devices:', Array.from(wait_for_finding_devices));
+        }
       });
     });
   }

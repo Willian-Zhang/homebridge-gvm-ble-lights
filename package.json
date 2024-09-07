@@ -1,19 +1,19 @@
 {
-  "displayName": "BLE lights",
-  "name": "homebridge-ble-lights",
-  "version": "1.0.8",
+  "displayName": "GVM BLE lights",
+  "name": "homebridge-gvm-ble-lights",
+  "version": "0.0.1",
   "description": "A short description about what your plugin does.",
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git://github.com/kszpakowski/homebridge-ble-lights.git"
+    "url": "git://github.com/Willian-Zhang/homebridge-gvm-ble-lights"
   },
   "bugs": {
-    "url": "https://github.com/kszpakowski/homebridge-ble-lights/issues"
+    "url": "https://github.com/Willian-Zhang/homebridge-gvm-ble-lights/issues"
   },
   "engines": {
-    "node": "^18.17.0 || ^20.9.0",
+    "node": "^18.17.0 || ^20 || ^22",
     "homebridge": "^1.8.0"
   },
   "main": "dist/index.js",
@@ -28,17 +28,18 @@
     "homebridge-plugin"
   ],
   "devDependencies": {
-    "@types/node": "^20.12.13",
-    "@typescript-eslint/eslint-plugin": "^7.11.0",
-    "@typescript-eslint/parser": "^7.11.0",
-    "eslint": "^8.57.0",
-    "homebridge": "^1.8.2",
-    "nodemon": "^3.1.2",
-    "rimraf": "^5.0.7",
+    "@types/node": "^22.5.4",
+    "@typescript-eslint/eslint-plugin": "^8.4.0",
+    "@typescript-eslint/parser": "^8.4.0",
+    "eslint": "^9.10.0",
+    "homebridge": "^1.8.4",
+    "nodemon": "^3.1.4",
+    "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.5.4"
   },
   "dependencies": {
-    "@abandonware/noble": "^1.9.2-25"
+    "@abandonware/noble": "^1.9.2-25",
+    "crc": "^4.3.2"
   }
 }

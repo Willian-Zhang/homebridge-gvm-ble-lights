@@ -2,15 +2,17 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { BleLights } from './platform.js';
 import { Characteristic, Peripheral, ServicesAndCharacteristics } from '@abandonware/noble';
+import {CRCBuffer, onoff, start_with, brightness, temprature, infoAll} from './bufferHelper.js'
 
-export class BleLightAccessory {
+
+export class GVMBleLightAccessory {
   private service: Service;
 
   private on: boolean = false;
   private brightness: number = 100;
+  private temprature: number = 3200;
 
-  private set_on_characteristic: Characteristic | undefined;
-  private set_brightness_characteristic: Characteristic | undefined;
+  private char: Characteristic | undefined;
 
   constructor(
     private readonly platform: BleLights,
@@ -18,44 +20,28 @@ export class BleLightAccessory {
     private readonly peripheral: Peripheral,
   ) {
 
-    // const on_characteristic_uuid = 'd00b8ba4d8ce42ff92f2b0d193c58da4';
-    const set_on_characteristic_uuid = '19380250824b46c797a979761b8a27a7';
-    // const brightness_characteristic_uuid = '127cf8c9b7fe47e3b2e03901b7988b00';
-    const set_brightness_characteristic_uuid = '66286dbfe5e946d4b300a0ec456f677c';
+    const char_uuid = '000102030405060708090a0b0c0d2b10';
 
     peripheral.connectAsync()
       .then(() => this.platform.log.info('Peripheral connected', peripheral.id))
-      .then(() => peripheral.discoverAllServicesAndCharacteristicsAsync())
+      .then(() => peripheral.discoverSomeServicesAndCharacteristicsAsync([], [char_uuid]))
       .then(({ characteristics }: ServicesAndCharacteristics) => {
         this.platform.log.info('Configuring discovered characteristics', peripheral.id);
-        this.set_on_characteristic = characteristics.find(chr => chr.uuid === set_on_characteristic_uuid);
-        this.set_brightness_characteristic = characteristics.find(chr => chr.uuid === set_brightness_characteristic_uuid);
+        this.char = characteristics.find(chr => chr.uuid === char_uuid);
 
-        /*
-        const on_characteristic = characteristics.find(chr => chr.uuid === on_characteristic_uuid);
-        if (on_characteristic) {
-          on_characteristic.subscribe();
+
+        if (this.char) {
+          this.char.subscribe();
           this.platform.log.info('Subscribed to peripheral "on" characterisitic', peripheral.id);
-          on_characteristic.on('data', buff => {
-            const on = buff.readInt8() === 1;
-            this.on = on;
-            this.platform.log.info('received on update', this.peripheral.id, on);
-            this.service.updateCharacteristic(this.platform.Characteristic.On, on);
+          this.char.on('data', (data, isNotification) => {
+            if (isNotification) {
+              this.onNotification(data);
+            }
           });
-        }
+          this.char.notifyAsync(true);
 
-        const brightness_characteristic = characteristics.find(chr => chr.uuid === brightness_characteristic_uuid);
-        if (brightness_characteristic) {
-          brightness_characteristic.subscribe();
-          this.platform.log.info('Subscribed to peripheral "brightness" characterisitic', peripheral.id);
-          brightness_characteristic.on('data', buff => {
-            const brightness = buff.readInt8();
-            this.brightness = brightness;
-            this.platform.log.info('received brightness update', this.peripheral.id, brightness);
-            this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
-          });
+          this.sendBuffer(infoAll());
         }
-        */
 
       });
 
@@ -67,46 +53,119 @@ export class BleLightAccessory {
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
     // this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
 
-    // register handlers for the On/Off Characteristic
     this.service.getCharacteristic(this.platform.Characteristic.On)
-      .onSet(this.setOn.bind(this))
+      .onSet(this.sendValue.bind(this, onoff))
       .onGet(this.getOn.bind(this));
 
-    // register handlers for the Brightness Characteristic
     this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this))
+      .onSet(this.sendValue.bind(this, brightness))
       .onGet(this.getBrightness.bind(this));
+    
+    this.service.getCharacteristic(this.platform.Characteristic.ColorTemperature)
+      .onSet(this.sendTemprature.bind(this))
+      .onGet(this.getTemprature.bind(this));
   }
 
-  updateState(on: boolean, brightness: number) {
-    this.service.updateCharacteristic(this.platform.Characteristic.On, on);
-    this.service.updateCharacteristic(this.platform.Characteristic.Brightness, brightness);
-  }
-
-  async setOn(value: CharacteristicValue) {
-    if (this.set_on_characteristic) {
-      this.platform.log.info('Setting charasterictic on', value);
-      const buff = Buffer.alloc(1);
-      buff.writeInt8(value as number, 0);
-      await this.set_on_characteristic.writeAsync(buff, false);
+  onStateChange(cmd: Buffer) {
+    const state_key = cmd.readInt8(2);
+    switch (state_key) {
+      case 0x00:
+        // onoff
+        this.platform.log.info('< onoff', cmd.readInt8(3));
+        break;
+      case 0x02:
+        // brightness
+        this.platform.log.info('< brightness', cmd.readInt8(3));
+        break;
+      case 0x03:
+        // temprature
+        this.platform.log.info('< temprature', cmd.readInt8(3));
+        break;
+      default:
+        this.platform.log.error('can\'t recognize state_key', state_key);
+        break;
     }
+  }
+
+  onStateChangeAll(cmd: Buffer) {
+    const onoff = cmd.readInt8(1);
+    const idonknowwhat = cmd.readInt8(2);
+    const brightness = cmd.readInt8(3);
+    const temprature = cmd.readInt8(4);
+    this.platform.log.info('<< onoff', onoff, 'brightness', brightness, 'temprature', temprature, 'idonknowwhat', idonknowwhat);
+    this.on = onoff === 1;
+    this.brightness = brightness;
+    this.temprature = temprature * 100;
+    this.service.updateCharacteristic(this.platform.Characteristic.On, this.on);
+    this.service.updateCharacteristic(this.platform.Characteristic.Brightness, this.brightness);
+    this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, this.temprature);
+  }
+
+  onNotification(data: Buffer) {
+    let start = 0;
+    const buffer = Buffer.from(data);
+    while (start < buffer.length) {
+      if (!start_with(buffer, Buffer.from([0x4C, 0x54]))) {
+        this.platform.log.error('header error, buffer', buffer);
+      }
+      start += 2;
+      const len = buffer.readInt8(start);
+      if (start + len > buffer.length) {
+        this.platform.log.error(`len error, reading ${len} bytes, rests`, buffer.slice(start));
+        return;
+      }
+      start += 1;
+      let cmd = buffer.subarray(start, start + len);
+      const crc = CRCBuffer(buffer.subarray(start - 3, start + len - 2));
+      if (crc.compare(cmd.subarray(len - 2)) != 0) {
+        this.platform.log.error(`crc error, crc-cmd, ${cmd.subarray(len - 2).toString()}, crc, ${crc}`);
+        return;
+      }
+      cmd = cmd.subarray(0, len - 2);
+      console.log('cmd', cmd);
+      if (!start_with(cmd, Buffer.from([0x00, 0x20]))) {
+        this.platform.log.error('can\'t recognize cmd', cmd);
+      }
+      cmd = cmd.subarray(2);
+      const state_cat = cmd.readInt8(0);
+      switch (state_cat) {
+        case 0x02:
+          this.onStateChange(cmd);
+          break;
+        case 0x03:
+          // report all states
+          this.onStateChangeAll(cmd);
+          break;
+        default:
+          this.platform.log.info('can\'t recognize state_cat', state_cat, cmd);
+          break;
+      }
+      start += len;
+    }
+  }
+
+  async sendBuffer(buffer: Buffer){
+    this.platform.log.info('Setting charasterictic with buffer', buffer);
+    if (this.char) {
+      return await this.char.writeAsync(buffer, true);
+    }
+  }
+  async sendValue(buffer_func: (value: number) => Buffer, value: CharacteristicValue){
+    let buff = buffer_func(value as number);
+    return await this.sendBuffer(buff);
+  }
+  async sendTemprature(value: CharacteristicValue){
+    let buff = temprature(value as number/100);
+    return await this.sendBuffer(buff);
   }
 
   async getOn(): Promise<CharacteristicValue> {
     return this.on;
   }
-
-  async setBrightness(value: CharacteristicValue) {
-    if (this.set_brightness_characteristic) {
-      this.platform.log.info('Setting charasterictic brightess', value);
-      const buff = Buffer.alloc(1);
-      buff.writeInt8(value as number, 0);
-      await this.set_brightness_characteristic.writeAsync(buff, false);
-    }
-  }
-
   async getBrightness(): Promise<CharacteristicValue> {
     return this.brightness;
   }
-
+  async getTemprature(): Promise<CharacteristicValue> {
+    return this.temprature;
+  }
 }
