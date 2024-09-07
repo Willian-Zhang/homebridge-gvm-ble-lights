@@ -74,6 +74,7 @@ export class BleLights implements DynamicPlatformPlugin {
           this.log.debug('Still waiting for devices:', Array.from(wait_for_finding_devices));
         }
       });
+      // TODO: reconnect
     });
   }
 

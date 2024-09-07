@@ -68,18 +68,25 @@ export class GVMBleLightAccessory {
 
   onStateChange(cmd: Buffer) {
     const state_key = cmd.readInt8(2);
+    const value = cmd.readInt8(3)
     switch (state_key) {
       case 0x00:
         // onoff
-        this.platform.log.info('< onoff', cmd.readInt8(3));
+        this.platform.log.info('< onoff', value);
+        this.on = value === 1;
+        this.service.updateCharacteristic(this.platform.Characteristic.On, this.on);
         break;
       case 0x02:
         // brightness
-        this.platform.log.info('< brightness', cmd.readInt8(3));
+        this.platform.log.info('< brightness', value);
+        this.brightness = value;
+        this.service.updateCharacteristic(this.platform.Characteristic.Brightness, this.brightness);
         break;
       case 0x03:
         // temprature
-        this.platform.log.info('< temprature', cmd.readInt8(3));
+        this.platform.log.info('< temprature', value);
+        this.temprature = value * 100;
+        this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, this.temprature);
         break;
       default:
         this.platform.log.error('can\'t recognize state_key', state_key);
