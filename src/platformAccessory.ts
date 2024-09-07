@@ -10,7 +10,8 @@ export class GVMBleLightAccessory {
 
   private on: boolean = false;
   private brightness: number = 100;
-  private temprature: number = 3200;
+  private temprature: number = 32;
+  // 312 - 178 mired
 
   private char: Characteristic | undefined;
 
@@ -85,8 +86,8 @@ export class GVMBleLightAccessory {
       case 0x03:
         // temprature
         this.platform.log.info('< temprature', value);
-        this.temprature = value * 100;
-        this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, this.temprature);
+        this.temprature = value ;
+        this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, 10_000 / this.temprature);
         break;
       default:
         this.platform.log.error('can\'t recognize state_key', state_key);
@@ -99,13 +100,13 @@ export class GVMBleLightAccessory {
     const idonknowwhat = cmd.readInt8(2);
     const brightness = cmd.readInt8(3);
     const temprature = cmd.readInt8(4);
-    this.platform.log.info('<< onoff', onoff, 'brightness', brightness, 'temprature', temprature, 'idonknowwhat', idonknowwhat);
+    this.platform.log.debug('<< onoff', onoff, 'brightness', brightness, 'temprature', temprature, 'idonknowwhat', idonknowwhat);
     this.on = onoff === 1;
     this.brightness = brightness;
-    this.temprature = temprature * 100;
+    this.temprature = temprature;
     this.service.updateCharacteristic(this.platform.Characteristic.On, this.on);
     this.service.updateCharacteristic(this.platform.Characteristic.Brightness, this.brightness);
-    this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, this.temprature);
+    this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, 10_000 / this.temprature);
   }
 
   onNotification(data: Buffer) {
@@ -129,7 +130,7 @@ export class GVMBleLightAccessory {
         return;
       }
       cmd = cmd.subarray(0, len - 2);
-      console.log('cmd', cmd);
+
       if (!start_with(cmd, Buffer.from([0x00, 0x20]))) {
         this.platform.log.error('can\'t recognize cmd', cmd);
       }
@@ -152,7 +153,7 @@ export class GVMBleLightAccessory {
   }
 
   async sendBuffer(buffer: Buffer){
-    this.platform.log.info('Setting charasterictic with buffer', buffer);
+    this.platform.log.debug('Setting charasterictic with buffer', buffer);
     if (this.char) {
       return await this.char.writeAsync(buffer, true);
     }
@@ -162,7 +163,7 @@ export class GVMBleLightAccessory {
     return await this.sendBuffer(buff);
   }
   async sendTemprature(value: CharacteristicValue){
-    let buff = temprature(value as number/100);
+    let buff = temprature(10_000 / (value as number));
     return await this.sendBuffer(buff);
   }
 
@@ -173,6 +174,6 @@ export class GVMBleLightAccessory {
     return this.brightness;
   }
   async getTemprature(): Promise<CharacteristicValue> {
-    return this.temprature;
+    return 10_000 / this.temprature;
   }
 }
