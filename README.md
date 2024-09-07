@@ -21,7 +21,17 @@
 ## Usage
 - identify the id of your light, put it in the config file
 - or you have only one BLE light named `BT_LED`, you can use the default config file
-
+exapmle:
+```json
+{
+    "devices": [
+        {
+            "name": "GVM LED"
+        }
+    ],
+    "platform": "gvm-ble-lights"
+},
+```
 
 <span align="center">
 
