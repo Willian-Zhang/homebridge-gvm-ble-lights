@@ -35,9 +35,9 @@ exapmle:
     - head to Preferences -> Security & Privacy -> Privacy -> Bluetooth
     - add node to the whitelist
   - linux:
-    - TODO: explain how to whitelist node
+    - [check here](https://www.npmjs.com/package/@abandonware/noble#linux)
   - windows: 
-    - TODO: find a guide
+    - [check here](https://www.npmjs.com/package/@abandonware/noble#windows)
 
 
 ### mutiple devices
