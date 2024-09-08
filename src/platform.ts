@@ -65,13 +65,13 @@ export class BleLights implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       this.log.info('finished launching');
       const wait_for_finding_devices = new Set();
-      let device_no_id = false;
+      // let device_no_id = false;
       for (const device of this.config.devices || []) {
         if (device.id) {
           wait_for_finding_devices.add(device.id);
         } else{
           // Only one device without id is allowed
-          device_no_id = true;
+          // device_no_id = true;
           break;
         }
       }
