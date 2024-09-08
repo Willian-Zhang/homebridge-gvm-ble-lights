@@ -11,6 +11,28 @@ export class BleLights implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
 
+  private isScanning = false;
+  async startScanning() {
+    const service_uuid = '1812';
+    if (this.isScanning) {
+      this.log.debug('Already scanning');
+      return;
+    }
+    this.log.debug('Starting scanning');
+    this.isScanning = true;
+    noble.on('scanStop', () => {
+      this.log.debug('Scan stopped');
+      this.isScanning = false;
+    });
+    await noble.startScanningAsync([service_uuid], false);
+  }
+
+  stopScanning() {
+    this.log.debug('Stopping scanning');
+    this.isScanning = false
+    noble.stopScanning();
+  }
+
   constructor(
     public readonly log: Logging,
     public readonly config: PlatformConfig & {
@@ -21,12 +43,13 @@ export class BleLights implements DynamicPlatformPlugin {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
 
-    const service_uuid = '1812';
+    
     noble.on('stateChange', async (state: string) => {
       this.log.debug('Noble state changed to:', state);
       if (state === 'poweredOn') {
-        await noble.startScanningAsync([service_uuid], false);
-      }else if (state === 'unauthorized') {
+        this.startScanning();
+      }
+      else if (state === 'unauthorized') {
         this.log.error('BLE device not authorized, try add this app to the whitelist');
       }
     });
@@ -42,8 +65,15 @@ export class BleLights implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       this.log.info('finished launching');
       const wait_for_finding_devices = new Set();
+      let device_no_id = false;
       for (const device of this.config.devices || []) {
-        wait_for_finding_devices.add(device.id);
+        if (device.id) {
+          wait_for_finding_devices.add(device.id);
+        } else{
+          // Only one device without id is allowed
+          device_no_id = true;
+          break;
+        }
       }
       const found_devices = new Set();
       noble.on('discover', async (peripheral: Peripheral) => {
@@ -69,10 +99,16 @@ export class BleLights implements DynamicPlatformPlugin {
         }else {
           new GVMBleLightAccessory(this, existingAccessory, peripheral);
         }
+        peripheral.once('disconnect', () => {
+          this.log.info('Peripheral disconnected:', id);
+          found_devices.delete(id);
+          wait_for_finding_devices.add(id);
+          this.startScanning();
+        });
         found_devices.add(id);
         wait_for_finding_devices.delete(id);
         if (wait_for_finding_devices.size === 0) {
-          noble.stopScanning();
+          this.stopScanning();
         }else {
           this.log.debug('Still waiting for devices:', Array.from(wait_for_finding_devices));
         }
