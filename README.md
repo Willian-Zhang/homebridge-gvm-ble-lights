@@ -53,7 +53,7 @@ for mutiple devices, id must be specified:
     "platform": "gvm-ble-lights"
 },
 ```
-this id can be found in the log when the plugin is without id, so currently you might have to add them one by one
+this id can be found in the log when `devices` is not specified.
 
 
 ## Known Issues

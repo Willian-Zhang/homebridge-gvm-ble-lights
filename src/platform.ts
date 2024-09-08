@@ -115,7 +115,7 @@ export class BleLights implements DynamicPlatformPlugin {
         });
         found_devices.add(id);
         wait_for_finding_devices.delete(id);
-        if (wait_for_finding_devices.size === 0) {
+        if (wait_for_finding_devices.size === 0 && this.config.devices) {
           this.stopScanning();
         }else {
           this.log.debug('Still waiting for devices:', Array.from(wait_for_finding_devices));
