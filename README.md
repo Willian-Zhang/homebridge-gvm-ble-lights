@@ -41,3 +41,19 @@ exapmle:
     - TODO: explain how to whitelist node
   - windows: 
     - TODO: find a guide
+
+
+### mutiple devices
+for mutiple devices, id must be specified:
+```json
+{
+    "devices": [
+        {
+            "name": "GVM LED",
+            "id": "some uuid"
+        }
+    ],
+    "platform": "gvm-ble-lights"
+},
+```
+this id can be found in the log when the plugin is without id, so currently you might have to add them one by one
