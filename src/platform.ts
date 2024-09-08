@@ -87,12 +87,20 @@ export class BleLights implements DynamicPlatformPlugin {
         }
         this.log.info('Discovered peripherial', peripheral.id);
         const { id } = peripheral;
+        let match_config = null;
+        for (const device of this.config.devices || []) {
+          if (device.id === id) {
+            match_config = device;
+            break;
+          }
+        }
+
         const uuid = this.api.hap.uuid.generate(id);
         const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-
+        
         if (!existingAccessory) {
           this.log.info('Adding new accessory:', uuid);
-          const accessory = new this.api.platformAccessory(id, uuid);
+          const accessory = new this.api.platformAccessory(match_config?.name ?? "GVM Light", uuid);
           new GVMBleLightAccessory(this, accessory, peripheral);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
           this.accessories.push(accessory);
