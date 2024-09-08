@@ -14,9 +14,6 @@
 ## Not Supported Features
 - Channel control (I have got only one channel light, so I can't test this feature)
 - Scene control
-
-## Known Issues
-- Some communication issues with the light is still unknown
   
 ## Usage
 - identify the id of your light, put it in the config file
@@ -57,3 +54,7 @@ for mutiple devices, id must be specified:
 },
 ```
 this id can be found in the log when the plugin is without id, so currently you might have to add them one by one
+
+
+## Known Issues
+- Some communication protocal with the light is still unknown
