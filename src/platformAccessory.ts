@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { BleLights } from './platform.js';
-import { Characteristic, Peripheral, ServicesAndCharacteristics } from '@abandonware/noble';
+import { Characteristic, Peripheral } from '@abandonware/noble';
 import {CRCBuffer, onoff, start_with, brightness, temprature, infoAll} from './bufferHelper.js'
 
 
@@ -50,7 +50,7 @@ export class GVMBleLightAccessory {
   }
   async after_connect(peripheral: Peripheral){
     this.platform.log.info('Peripheral connected', peripheral.id)
-    let {characteristics} = await peripheral.discoverSomeServicesAndCharacteristicsAsync([], [GVMBleLightAccessory.char_uuid])
+    const {characteristics} = await peripheral.discoverSomeServicesAndCharacteristicsAsync([], [GVMBleLightAccessory.char_uuid])
     
     this.platform.log.info('Configuring discovered characteristics', peripheral.id);
     this.char = characteristics.find(chr => chr.uuid === GVMBleLightAccessory.char_uuid);
