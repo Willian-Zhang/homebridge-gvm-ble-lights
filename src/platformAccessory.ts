@@ -14,40 +14,20 @@ export class GVMBleLightAccessory {
   // 312 - 178 mired
 
   private char: Characteristic | undefined;
+  private static char_uuid = '000102030405060708090a0b0c0d2b10';
 
   constructor(
     private readonly platform: BleLights,
     private readonly accessory: PlatformAccessory,
     private readonly peripheral: Peripheral,
   ) {
-
-    const char_uuid = '000102030405060708090a0b0c0d2b10';
-
     peripheral.connectAsync()
-      .then(() => this.platform.log.info('Peripheral connected', peripheral.id))
-      .then(() => peripheral.discoverSomeServicesAndCharacteristicsAsync([], [char_uuid]))
-      .then(({ characteristics }: ServicesAndCharacteristics) => {
-        this.platform.log.info('Configuring discovered characteristics', peripheral.id);
-        this.char = characteristics.find(chr => chr.uuid === char_uuid);
-
-
-        if (this.char) {
-          this.char.subscribe();
-          this.platform.log.info('Subscribed to peripheral "on" characterisitic', peripheral.id);
-          this.char.on('data', (data, isNotification) => {
-            if (isNotification) {
-              this.onNotification(data);
-            }
-          });
-          this.char.notifyAsync(true);
-
-          this.sendBuffer(infoAll());
-        }
-
+      .then(() => this.after_connect(peripheral))
+      .catch((err) => {
+        this.platform.log.error('Failed to connect', err);
       });
 
     this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
-
 
     // this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
     
@@ -68,7 +48,29 @@ export class GVMBleLightAccessory {
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this));
   }
+  async after_connect(peripheral: Peripheral){
+    this.platform.log.info('Peripheral connected', peripheral.id)
+    let {characteristics} = await peripheral.discoverSomeServicesAndCharacteristicsAsync([], [GVMBleLightAccessory.char_uuid])
+    
+    this.platform.log.info('Configuring discovered characteristics', peripheral.id);
+    this.char = characteristics.find(chr => chr.uuid === GVMBleLightAccessory.char_uuid);
 
+    if (this.char) {
+      await this.char.subscribeAsync();
+      this.platform.log.info('Subscribed to peripheral characterisitics', peripheral.id);
+      this.char.on('data', (data, isNotification) => {
+        if (isNotification) {
+          this.onNotification(data);
+        }
+      });
+      await this.char.notifyAsync(true);
+
+      await this.sendBuffer(infoAll());
+    }
+  }
+  async disconnect(){
+    await this.peripheral.disconnectAsync();
+  }
   onStateChange(cmd: Buffer) {
     const state_key = cmd.readInt8(2);
     const value = cmd.readInt8(3)

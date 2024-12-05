@@ -10,6 +10,7 @@ export class BleLights implements DynamicPlatformPlugin {
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
+  private found_devices:Set<string> = new Set();
 
   private isScanning = false;
   async startScanning() {
@@ -75,13 +76,12 @@ export class BleLights implements DynamicPlatformPlugin {
           break;
         }
       }
-      const found_devices = new Set();
       noble.on('discover', async (peripheral: Peripheral) => {
         if (!this.config.devices?.at(0)?.id && peripheral.advertisement.localName !== 'BT_LED') {
           this.log.debug('Ignoring peripheral', peripheral.id, peripheral.advertisement.localName);
           return;
         }
-        if (found_devices.has(peripheral.id)) {
+        if (this.found_devices.has(peripheral.id)) {
           this.log.info('Ignoring already found peripheral', peripheral.id);
           return;
         }
@@ -97,23 +97,27 @@ export class BleLights implements DynamicPlatformPlugin {
 
         const uuid = this.api.hap.uuid.generate(id);
         const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-        
+        let acc;
         if (!existingAccessory) {
           this.log.info('Adding new accessory:', uuid);
           const accessory = new this.api.platformAccessory(match_config?.name ?? "GVM Light", uuid);
-          new GVMBleLightAccessory(this, accessory, peripheral);
+          acc = new GVMBleLightAccessory(this, accessory, peripheral);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
           this.accessories.push(accessory);
         }else {
-          new GVMBleLightAccessory(this, existingAccessory, peripheral);
+          this.log.info('Register existing accessory:', uuid);
+          acc = new GVMBleLightAccessory(this, existingAccessory, peripheral);
         }
-        peripheral.once('disconnect', () => {
-          this.log.info('Peripheral disconnected:', id);
-          found_devices.delete(id);
+
+        this.found_devices.add(id);
+        peripheral.once('disconnect', async (err) => {
+          this.log.info('Peripherial disconnected:', id);
+          this.log.debug('Reason:', err);
+          this.found_devices.delete(id);
           wait_for_finding_devices.add(id);
+          await acc.disconnect()
           this.startScanning();
         });
-        found_devices.add(id);
         wait_for_finding_devices.delete(id);
         if (wait_for_finding_devices.size === 0 && this.config.devices) {
           this.stopScanning();
