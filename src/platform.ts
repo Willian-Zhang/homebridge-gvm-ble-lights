@@ -115,7 +115,7 @@ export class BleLights implements DynamicPlatformPlugin {
           this.log.debug('Reason:', err);
           this.found_devices.delete(id);
           wait_for_finding_devices.add(id);
-          await acc.disconnect()
+          acc.disconnect().catch(this.log.debug)
           this.startScanning();
         });
         wait_for_finding_devices.delete(id);
