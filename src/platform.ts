@@ -21,7 +21,7 @@ export class BleLights implements DynamicPlatformPlugin {
     }
     this.log.debug('Starting scanning');
     this.isScanning = true;
-    noble.on('scanStop', () => {
+    noble.once('scanStop', () => {
       this.log.debug('Scan stopped');
       this.isScanning = false;
     });
@@ -52,6 +52,9 @@ export class BleLights implements DynamicPlatformPlugin {
       }
       else if (state === 'unauthorized') {
         this.log.error('BLE device not authorized, try add this app to the whitelist');
+      }else if (state === 'resetting') {
+        this.log.info('BLE resetting, waiting for it to be poweredOn again...');
+        this.found_devices.clear();
       }
     });
 
