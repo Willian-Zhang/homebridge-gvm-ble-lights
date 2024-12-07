@@ -58,3 +58,6 @@ this id can be found in the log when `devices` is not specified.
 
 ## Known Issues
 - Some communication protocal with the light is still unknown
+
+## Version histroy 
+- 1.1.7 fix: sometime device no response after interal state change of BLE server.
