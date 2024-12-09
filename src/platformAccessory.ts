@@ -37,14 +37,20 @@ export class GVMBleLightAccessory {
     this.service.updateCharacteristic(this.platform.Characteristic.FirmwareRevision, process.env.npm_package_version ?? '0.0.0');
 
     this.service.getCharacteristic(this.platform.Characteristic.On)
+      .removeOnGet()
+      .removeOnSet()
       .onSet(this.sendValue.bind(this, onoff))
       .onGet(this.getOn.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.Brightness)
+      .removeOnGet()
+      .removeOnSet()
       .onSet(this.sendValue.bind(this, brightness))
       .onGet(this.getBrightness.bind(this));
     
     this.service.getCharacteristic(this.platform.Characteristic.ColorTemperature)
+      .removeOnGet()
+      .removeOnSet()
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this));
   }
