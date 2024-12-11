@@ -11,6 +11,7 @@ export class BleLights implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
   private found_devices:Set<string> = new Set();
+  private connected_preripherals: Set<Peripheral> = new Set();
 
   private isScanning = false;
   async startScanning() {
@@ -54,7 +55,9 @@ export class BleLights implements DynamicPlatformPlugin {
         this.log.error('BLE device not authorized, try add this app to the whitelist');
       }else if (state === 'resetting') {
         this.log.info('BLE resetting, waiting for it to be poweredOn again...');
-        this.found_devices.clear();
+        this.connected_preripherals.forEach((p) => p.disconnect())
+        // this.found_devices.clear();
+        // this.connected_preripherals.clear()
       }
     });
 
@@ -90,33 +93,34 @@ export class BleLights implements DynamicPlatformPlugin {
         }
         this.log.info('Discovered peripherial', peripheral.id);
         const { id } = peripheral;
-        let match_config = null;
-        for (const device of this.config.devices || []) {
-          if (device.id === id) {
-            match_config = device;
-            break;
-          }
-        }
-
         const uuid = this.api.hap.uuid.generate(id);
+        if(!peripheral.connectable){
+          this.log.info('peripheral not connectable:', id);
+          return
+        }
+        const match_config = this.config.devices?.find((d) => d.id === id);
+
         const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
         let acc;
         if (!existingAccessory) {
-          this.log.info('Adding new accessory:', uuid);
+          this.log.info('Adding new accessory:', id);
           const accessory = new this.api.platformAccessory(match_config?.name ?? "GVM Light", uuid);
           acc = new GVMBleLightAccessory(this, accessory, peripheral);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
           this.accessories.push(accessory);
         }else {
-          this.log.info('Register existing accessory:', uuid);
+          this.log.info('Register existing accessory:', id);
           acc = new GVMBleLightAccessory(this, existingAccessory, peripheral);
         }
 
+        // TODO: maybe use internel all connected peripherials
         this.found_devices.add(id);
+        this.connected_preripherals.add(peripheral)
         peripheral.once('disconnect', async (err) => {
           this.log.info('Peripherial disconnected:', id);
           this.log.debug('Reason:', err);
           this.found_devices.delete(id);
+          this.connected_preripherals.delete(peripheral);
           wait_for_finding_devices.add(id);
           acc.disconnect().catch(this.log.debug)
           this.startScanning();
