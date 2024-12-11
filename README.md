@@ -63,3 +63,4 @@ this id can be found in the log when `devices` is not specified.
 - 1.1.7 fix: sometime device no response after interal state change of BLE server.
 - 1.1.8 fix: stops working after 10 reconnection Homebridge limitation.
 - 1.1.9 fix: a bug stops reconneceting to device after reset (Homebridge YOU SHOULD DOCUMENT LIFETIME PROPERLY!!!)
+- 1.1.10 fix: a bug stops reconneceting to device after reset try 2

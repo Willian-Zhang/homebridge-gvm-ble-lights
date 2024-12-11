@@ -56,8 +56,8 @@ export class BleLights implements DynamicPlatformPlugin {
       }else if (state === 'resetting') {
         this.log.info('BLE resetting, waiting for it to be poweredOn again...');
         this.connected_preripherals.forEach((p) => p.disconnect())
-        // this.found_devices.clear();
-        // this.connected_preripherals.clear()
+        this.found_devices.clear();
+        this.connected_preripherals.clear()
       }
     });
 
