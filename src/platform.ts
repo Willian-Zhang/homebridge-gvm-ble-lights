@@ -55,7 +55,6 @@ export class BleLights implements DynamicPlatformPlugin {
         this.log.error('BLE device not authorized, try add this app to the whitelist');
       }else if (state === 'resetting') {
         this.log.info('BLE resetting, waiting for it to be poweredOn again...');
-        noble.reset()
         this.connected_preripherals.forEach((p) => p.disconnect())
         this.found_devices.clear();
         this.connected_preripherals.clear()
@@ -72,7 +71,6 @@ export class BleLights implements DynamicPlatformPlugin {
 
     this.api.on('didFinishLaunching', () => {
       this.log.info('finished launching');
-      noble.reset()
       const wait_for_finding_devices = new Set();
       // let device_no_id = false;
       for (const device of this.config.devices || []) {
