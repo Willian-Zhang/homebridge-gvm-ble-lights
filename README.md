@@ -68,3 +68,4 @@ this id can be found in the log when `devices` is not specified.
 - 1.1.12 fix: fix BLE device refuse to connect
 - 1.1.13 fix: try fix BLE device refuse to connect 2
 - 1.1.14 fix: try fix BLE device refuse to connect 3
+- 1.1.15 fix: try fix BLE device refuse to connect 4

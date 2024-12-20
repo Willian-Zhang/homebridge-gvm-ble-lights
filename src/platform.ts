@@ -30,9 +30,9 @@ export class BleLights implements DynamicPlatformPlugin {
   }
 
   stopScanning() {
-    this.log.debug('Stopping scanning');
+    this.log.debug('Stopping scanning...');
     this.isScanning = false
-    noble.stopScanning();
+    return noble.stopScanningAsync();
   }
 
   constructor(
@@ -127,10 +127,15 @@ export class BleLights implements DynamicPlatformPlugin {
         });
         wait_for_finding_devices.delete(id);
         if (wait_for_finding_devices.size === 0 && this.config.devices) {
-          this.stopScanning();
+          await this.stopScanning();
         }else {
           this.log.debug('Still waiting for devices:', Array.from(wait_for_finding_devices));
         }
+
+        acc.connect_and_subscribe(peripheral)
+          .catch((err) => {
+            this.log.error('Failed to connect', err);
+          });
       });
       // TODO: reconnect
     });

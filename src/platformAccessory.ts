@@ -21,11 +21,6 @@ export class GVMBleLightAccessory {
     private readonly accessory: PlatformAccessory,
     private readonly peripheral: Peripheral,
   ) {
-    this.connect_and_subscribe(peripheral)
-      .catch((err) => {
-        this.platform.log.error('Failed to connect', err);
-      });
-
     this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
 
     // this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
@@ -53,6 +48,11 @@ export class GVMBleLightAccessory {
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this));
   }
+  /**
+   * Must be called for the device to work
+   *
+   * @param {Peripheral} peripheral
+   */
   async connect_and_subscribe(peripheral: Peripheral){
     await peripheral.connectAsync()
     this.platform.log.info('Peripheral connected', peripheral.id)
