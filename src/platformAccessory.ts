@@ -21,8 +21,7 @@ export class GVMBleLightAccessory {
     private readonly accessory: PlatformAccessory,
     private readonly peripheral: Peripheral,
   ) {
-    peripheral.connectAsync()
-      .then(() => this.after_connect.bind(this, peripheral))
+    this.connect_and_subscribe(peripheral)
       .catch((err) => {
         this.platform.log.error('Failed to connect', err);
       });
@@ -54,7 +53,8 @@ export class GVMBleLightAccessory {
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this));
   }
-  async after_connect(peripheral: Peripheral){
+  async connect_and_subscribe(peripheral: Peripheral){
+    await peripheral.connectAsync()
     this.platform.log.info('Peripheral connected', peripheral.id)
     const {characteristics} = await peripheral.discoverSomeServicesAndCharacteristicsAsync([], [GVMBleLightAccessory.char_uuid])
     
@@ -169,6 +169,8 @@ export class GVMBleLightAccessory {
     this.platform.log.debug('Setting charasterictic with buffer', buffer);
     if (this.char) {
       return await this.char.writeAsync(buffer, true);
+    }else{
+      this.platform.log.info('No characteristics present');
     }
   }
   async sendValue(buffer_func: (value: number) => Buffer, value: CharacteristicValue){
