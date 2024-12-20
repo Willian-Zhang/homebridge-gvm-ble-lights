@@ -22,7 +22,7 @@ export class GVMBleLightAccessory {
     private readonly peripheral: Peripheral,
   ) {
     peripheral.connectAsync()
-      .then(() => this.after_connect.bind(this, peripheral))
+    this.after_connect(peripheral)
       .catch((err) => {
         this.platform.log.error('Failed to connect', err);
       });
@@ -75,6 +75,9 @@ export class GVMBleLightAccessory {
     }
   }
   async disconnect(){
+    if(this.char){
+      this.char.unsubscribe();
+    }
     await this.peripheral.disconnectAsync();
   }
   onStateChange(cmd: Buffer) {
