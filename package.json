@@ -1,7 +1,7 @@
 {
   "displayName": "GVM BLE lights",
   "name": "homebridge-gvm-ble-lights",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Homebridge plugin adds GVM BLE devices support.",
   "license": "Apache-2.0",
   "type": "module",
