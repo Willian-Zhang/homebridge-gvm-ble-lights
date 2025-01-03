@@ -179,8 +179,8 @@ export class GVMBleLightAccessory {
   }
   async sendTemprature(value: CharacteristicValue){
     let temp = value as number;
-    temp = Math.max(temp, 3200);
-    temp = Math.min(temp, 5600);
+    temp = Math.max(temp, 320);
+    temp = Math.min(temp, 560);
     const buff = temprature(10_000 / temp);
     return await this.sendBuffer(buff);
   }
