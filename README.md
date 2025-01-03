@@ -74,3 +74,4 @@ this id can be found in the log when `devices` is not specified.
 - 1.2.2 chore: more log
 - 1.2.3 fix: color range specify
 - 1.2.4 fix: color range range
+- 1.2.5 fix: color int type

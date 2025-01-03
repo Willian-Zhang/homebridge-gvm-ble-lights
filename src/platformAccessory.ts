@@ -10,7 +10,7 @@ export class GVMBleLightAccessory {
 
   private on: boolean = false;
   private brightness: number = 100;
-  private temprature: number = 32;
+  private temprature: number = 320;
   // 312 - 178 mired
 
   private char: Characteristic | undefined;
@@ -48,8 +48,8 @@ export class GVMBleLightAccessory {
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this))
       .setProps({
-        minValue: 32,
-        maxValue: 56,
+        minValue: 320,
+        maxValue: 560,
       });
   }
   /**
@@ -102,7 +102,7 @@ export class GVMBleLightAccessory {
         break;
       case 0x03:
         // temprature
-        this.platform.log.info('< temprature', value);
+        this.platform.log.info('< temprature', value, `(${10_000/value})`);
         this.temprature = value ;
         this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, 10_000 / this.temprature);
         break;
@@ -193,10 +193,11 @@ export class GVMBleLightAccessory {
     return await this.sendBuffer(buff);
   }
   async sendTemprature(value: CharacteristicValue){
-    this.platform.log.info('> temprature', value);
     let temp = value as number;
-    temp = Math.max(temp, 32);
-    temp = Math.min(temp, 56);
+    temp = Math.max(temp, 320);
+    temp = Math.min(temp, 560);
+    temp = Math.round(temp);
+    this.platform.log.info('> temprature', temp, `(${value}`);
     const buff = temprature(10_000 / temp);
     return await this.sendBuffer(buff);
   }
