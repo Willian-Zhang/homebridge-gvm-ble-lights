@@ -46,7 +46,11 @@ export class GVMBleLightAccessory {
       .removeOnGet()
       .removeOnSet()
       .onSet(this.sendTemprature.bind(this))
-      .onGet(this.getTemprature.bind(this));
+      .onGet(this.getTemprature.bind(this))
+      .setProps({
+        minValue: 320,
+        maxValue: 560,
+      });
   }
   /**
    * Must be called for the device to work

@@ -72,3 +72,4 @@ this id can be found in the log when `devices` is not specified.
 - 1.2.0 fix: try fix brightness out of control when color temperature is out of range
 - 1.2.1 fix: temp range is not correct
 - 1.2.2 chore: more log
+- 1.2.3 fix: color range specify
