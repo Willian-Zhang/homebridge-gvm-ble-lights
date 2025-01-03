@@ -10,7 +10,7 @@ export class GVMBleLightAccessory {
 
   private on: boolean = false;
   private brightness: number = 100;
-  private temprature: number = 320;
+  private temprature: number = 312;
   // 312 - 178 mired
 
   private char: Characteristic | undefined;
@@ -47,9 +47,10 @@ export class GVMBleLightAccessory {
       .removeOnSet()
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this))
+      // mired
       .setProps({
-        minValue: 320,
-        maxValue: 560,
+        minValue: 179,
+        maxValue: 312,
       });
   }
   /**
@@ -196,9 +197,9 @@ export class GVMBleLightAccessory {
     let temp = value as number;
     temp = Math.max(temp, 320);
     temp = Math.min(temp, 560);
-    temp = Math.round(temp);
-    this.platform.log.info('> temprature', temp, `(${value}`);
-    const buff = temprature(10_000 / temp);
+    temp = Math.round(10_000 / temp);
+    this.platform.log.info('> temprature', temp, `(${10_000/temp})`);
+    const buff = temprature(temp);
     return await this.sendBuffer(buff);
   }
 
