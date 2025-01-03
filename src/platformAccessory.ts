@@ -10,8 +10,12 @@ export class GVMBleLightAccessory {
 
   private on: boolean = false;
   private brightness: number = 100;
-  private temprature: number = 312;
-  // 312 - 178 mired
+  
+  /**
+   * raw value from BLE device, range should be: 32 - 56
+   * projected value range for mired: 312 - 178 
+   */
+  private temprature: number = 32;
 
   private char: Characteristic | undefined;
   private static char_uuid = '000102030405060708090a0b0c0d2b10';
@@ -47,11 +51,11 @@ export class GVMBleLightAccessory {
       .removeOnSet()
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this))
-      // mired
-      .setProps({
-        minValue: 179,
-        maxValue: 312,
-      });
+      // TODO: maybe loose it a bit, 3100K was casted from 
+      // .setProps({
+      //   minValue: 179,
+      //   maxValue: 312,
+      // });
   }
   /**
    * Must be called for the device to work
@@ -195,9 +199,12 @@ export class GVMBleLightAccessory {
   }
   async sendTemprature(value: CharacteristicValue){
     let temp = value as number;
-    temp = Math.max(temp, 320);
-    temp = Math.min(temp, 560);
-    temp = Math.round(10_000 / temp);
+    // mirad range
+    temp = 10_000 / temp
+    // raw range
+    temp = Math.max(temp, 32);
+    temp = Math.min(temp, 56);
+    temp = Math.round(temp);
     this.platform.log.info('> temprature', temp, `(${10_000/temp})`);
     const buff = temprature(temp);
     return await this.sendBuffer(buff);

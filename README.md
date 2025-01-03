@@ -76,3 +76,4 @@ this id can be found in the log when `devices` is not specified.
 - 1.2.4 fix: color range range
 - 1.2.5 fix: color int type
 - 1.2.6 fix: color space
+- 1.2.7 fix: color space restriction
