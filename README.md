@@ -73,3 +73,4 @@ this id can be found in the log when `devices` is not specified.
 - 1.2.1 fix: temp range is not correct
 - 1.2.2 chore: more log
 - 1.2.3 fix: color range specify
+- 1.2.4 fix: color range range

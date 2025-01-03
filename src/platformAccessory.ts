@@ -48,8 +48,8 @@ export class GVMBleLightAccessory {
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this))
       .setProps({
-        minValue: 320,
-        maxValue: 560,
+        minValue: 32,
+        maxValue: 56,
       });
   }
   /**
@@ -195,8 +195,8 @@ export class GVMBleLightAccessory {
   async sendTemprature(value: CharacteristicValue){
     this.platform.log.info('> temprature', value);
     let temp = value as number;
-    temp = Math.max(temp, 320);
-    temp = Math.min(temp, 560);
+    temp = Math.max(temp, 32);
+    temp = Math.min(temp, 56);
     const buff = temprature(10_000 / temp);
     return await this.sendBuffer(buff);
   }
