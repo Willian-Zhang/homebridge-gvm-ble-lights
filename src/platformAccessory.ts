@@ -52,10 +52,10 @@ export class GVMBleLightAccessory {
       .onSet(this.sendTemprature.bind(this))
       .onGet(this.getTemprature.bind(this))
       // TODO: maybe loose it a bit, 3100K was casted from 
-      // .setProps({
-      //   minValue: 179,
-      //   maxValue: 312,
-      // });
+      .setProps({
+        minValue: 140,
+        maxValue: 400,
+      });
   }
   /**
    * Must be called for the device to work
