@@ -33,13 +33,13 @@ export class GVMBleLightAccessory {
     this.service.getCharacteristic(this.platform.Characteristic.On)
       .removeOnGet()
       .removeOnSet()
-      .onSet(this.sendValue.bind(this, onoff))
+      .onSet(this.sendOnOff.bind(this))
       .onGet(this.getOn.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.Brightness)
       .removeOnGet()
       .removeOnSet()
-      .onSet(this.sendValue.bind(this, brightness))
+      .onSet(this.sendBrightness.bind(this))
       .onGet(this.getBrightness.bind(this));
     
     this.service.getCharacteristic(this.platform.Characteristic.ColorTemperature)
@@ -177,7 +177,19 @@ export class GVMBleLightAccessory {
     const buff = buffer_func(value as number);
     return await this.sendBuffer(buff);
   }
+  async sendOnOff(value: CharacteristicValue){
+    const buff = onoff(value as number);
+    this.platform.log.info('> onoff', value);
+    return await this.sendBuffer(buff);
+  }
+
+  async sendBrightness(value: CharacteristicValue){
+    const buff = brightness(value as number);
+    this.platform.log.info('> brightness', value);
+    return await this.sendBuffer(buff);
+  }
   async sendTemprature(value: CharacteristicValue){
+    this.platform.log.info('> temprature', value);
     let temp = value as number;
     temp = Math.max(temp, 320);
     temp = Math.min(temp, 560);
