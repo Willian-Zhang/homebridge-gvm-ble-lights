@@ -63,7 +63,19 @@ export class GVMBleLightAccessory {
    * @param {Peripheral} peripheral
    */
   async connect_and_subscribe(peripheral: Peripheral){
-    await peripheral.connectAsync()
+    this.platform.log.debug('connect_and_subscribe');
+    for (let i = 0; i < 3; i++) {
+      try{
+        await peripheral.connectAsync()
+        break;
+      }catch(e){
+        this.platform.log.error('connect_and_subscribe', e);
+      }
+    }
+    if (peripheral.state !== 'connected') {
+      this.platform.log.error('connect_and_subscribe failed: ', peripheral.state);
+      return;
+    }
     this.platform.log.info('Peripheral connected', peripheral.id)
     const {characteristics} = await peripheral.discoverSomeServicesAndCharacteristicsAsync([], [GVMBleLightAccessory.char_uuid])
     
@@ -84,6 +96,7 @@ export class GVMBleLightAccessory {
     }
   }
   async disconnect(){
+    this.platform.log.debug('disconnect');
     if(this.char){
       this.char.unsubscribe();
     }

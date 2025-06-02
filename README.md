@@ -78,3 +78,4 @@ this id can be found in the log when `devices` is not specified.
 - 1.2.6 fix: color space
 - 1.2.7 fix: color space restriction
 - 1.2.8 fix: color range restriction
+- 1.2.9 fix: try fix BLE device refuse to connect 5
