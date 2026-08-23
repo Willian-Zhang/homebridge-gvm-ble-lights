@@ -55,6 +55,25 @@ for mutiple devices, id must be specified:
 ```
 this id can be found in the log when `devices` is not specified.
 
+### advanced options
+both are optional and in milliseconds:
+```json
+{
+    "devices": [
+        {
+            "name": "GVM LED"
+        }
+    ],
+    "pollInterval": 15000,
+    "timeout": 10000,
+    "platform": "gvm-ble-lights"
+},
+```
+- `pollInterval` (default `15000`): how often every light is checked for being alive. A light that stopped
+  answering is disconnected and looked for again.
+- `timeout` (default `10000`): how long a single Bluetooth operation may take before it is considered failed.
+  Increase it if your light is far away and connecting keeps timing out.
+
 
 ## Known Issues
 - Some communication protocal with the light is still unknown
@@ -79,3 +98,4 @@ this id can be found in the log when `devices` is not specified.
 - 1.2.7 fix: color space restriction
 - 1.2.8 fix: color range restriction
 - 1.2.9 fix: try fix BLE device refuse to connect 5
+- 1.3.0 fix: device stops responding after a Bluetooth adapter reset, all BLE calls are now bounded by a timeout and reconnection is watchdog-driven

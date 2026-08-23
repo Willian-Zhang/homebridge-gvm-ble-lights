@@ -1,6 +1,77 @@
 {
-  "pluginAlias": "ble-lights",
+  "pluginAlias": "gvm-ble-lights",
   "pluginType": "platform",
   "singular": true,
-  "schema": {}
+  "headerDisplay": "Adds GVM BLE (Bluetooth) lights to HomeKit. Leave the device list empty to pick up the single light advertising itself as `BT_LED`, the discovered device id is then printed to the Homebridge log.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "GVM BLE lights",
+        "description": "Name used for this platform in the Homebridge log."
+      },
+      "devices": {
+        "title": "Lights",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "default": "GVM LED",
+              "required": true,
+              "description": "Name of the light in HomeKit."
+            },
+            "id": {
+              "title": "Device ID",
+              "type": "string",
+              "description": "Bluetooth id of the light, as printed to the log when it is discovered. Required as soon as you have more than one light."
+            }
+          }
+        }
+      },
+      "pollInterval": {
+        "title": "Health check interval",
+        "type": "integer",
+        "default": 15000,
+        "minimum": 5000,
+        "maximum": 600000,
+        "description": "How often (in milliseconds) every light is checked for being alive. A light that stopped answering is disconnected and looked for again."
+      },
+      "timeout": {
+        "title": "Bluetooth timeout",
+        "type": "integer",
+        "default": 10000,
+        "minimum": 1000,
+        "maximum": 120000,
+        "description": "How long (in milliseconds) a single Bluetooth operation may take before it is considered failed. Increase it if your light is far away and connecting keeps timing out."
+      }
+    }
+  },
+  "layout": [
+    "name",
+    {
+      "key": "devices",
+      "type": "array",
+      "title": "Lights",
+      "buttonText": "Add light",
+      "items": [
+        "devices[].name",
+        "devices[].id"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "pollInterval",
+        "timeout"
+      ]
+    }
+  ]
 }
