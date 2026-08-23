@@ -1,13 +1,13 @@
 {
   "displayName": "GVM BLE lights",
   "name": "homebridge-gvm-ble-lights",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Homebridge plugin adds GVM BLE devices support.",
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git://github.com/Willian-Zhang/homebridge-gvm-ble-lights"
+    "url": "git+https://github.com/Willian-Zhang/homebridge-gvm-ble-lights.git"
   },
   "bugs": {
     "url": "https://github.com/Willian-Zhang/homebridge-gvm-ble-lights/issues"
