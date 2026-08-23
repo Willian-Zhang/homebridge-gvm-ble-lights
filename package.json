@@ -13,8 +13,8 @@
     "url": "https://github.com/Willian-Zhang/homebridge-gvm-ble-lights/issues"
   },
   "engines": {
-    "node": "^18.17.0 || ^20 || ^22",
-    "homebridge": "^1.8.0"
+    "node": "^18.17.0 || ^20 || ^22 || ^24",
+    "homebridge": "^1.8.0 || ^2.0.0"
   },
   "main": "dist/index.js",
   "scripts": {
@@ -22,7 +22,8 @@
     "lintFix": "eslint src/**/*.ts --max-warnings=0 --fix",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
-    "prepublishOnly": "npm run lint && npm run build"
+    "test": "npm run build && node test/commit-order.mjs",
+    "prepublishOnly": "npm run lint && npm test"
   },
   "keywords": [
     "homebridge-plugin"

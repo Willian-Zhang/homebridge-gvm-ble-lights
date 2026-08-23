@@ -3,7 +3,7 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { BleLights } from './platform.js';
 import { Characteristic, Peripheral } from '@abandonware/noble';
 import { CRCBuffer, onoff, start_with, brightness, temprature, infoAll } from './bufferHelper.js';
-import { errorMessage, seconds, withTimeout } from './util.js';
+import { delay, errorMessage, seconds, withTimeout } from './util.js';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected';
 
@@ -13,6 +13,26 @@ const CONNECT_ATTEMPTS = 3;
 const PROBE_AFTER = 20_000;
 /** ... and treat the link as dead when even the probe stays unanswered */
 const DEAD_AFTER = 60_000;
+/** HomeKit writes the characteristics of a scene separately, collect them for this long before talking to the light */
+const COMMIT_DEBOUNCE = 80;
+/** the light restores its own output while powering on, so wait before overriding it */
+const POWER_ON_SETTLE = 250;
+/** commands are written without a response, pace them instead of flooding a single connection interval */
+const WRITE_GAP = 50;
+
+/** what HomeKit asked for but what has not been written to the light yet */
+type DesiredState = {
+  on?: boolean;
+  brightness?: number;
+  /** raw device value, 32 - 56 */
+  temprature?: number;
+};
+
+/** one BLE command plus the time the light needs before the next one may follow */
+type Step = {
+  buffer: Buffer;
+  settle?: number;
+};
 
 export class GVMBleLightAccessory {
   private service: Service;
@@ -37,6 +57,13 @@ export class GVMBleLightAccessory {
   /** all BLE operations of one device are serialized through this chain */
   private queue: Promise<unknown> = Promise.resolve();
   private recovering = false;
+
+  private desired: DesiredState = {};
+  /** the values of the commit that is currently on the wire */
+  private inflight: DesiredState = {};
+  private commitTimer?: NodeJS.Timeout;
+  /** shared by every HomeKit write that ends up in the same commit */
+  private commit?: { promise: Promise<void>; resolve: () => void; reject: (err: unknown) => void };
 
   constructor(
     private readonly platform: BleLights,
@@ -164,6 +191,7 @@ export class GVMBleLightAccessory {
     }
 
     this.platform.log.info('Configuring discovered characteristics', this.deviceId);
+    this.platform.log.debug('Characteristic properties:', char.properties.join(', '));
     char.removeAllListeners('data');
     char.on('data', (data, isNotification) => {
       this.lastSeen = Date.now();
@@ -331,20 +359,17 @@ export class GVMBleLightAccessory {
       case 0x00:
         // onoff
         this.platform.log.info('< onoff', value);
-        this.on = value === 1;
-        this.service.updateCharacteristic(this.platform.Characteristic.On, this.on);
+        this.reportOn(value === 1);
         break;
       case 0x02:
         // brightness
         this.platform.log.info('< brightness', value);
-        this.brightness = value;
-        this.service.updateCharacteristic(this.platform.Characteristic.Brightness, this.brightness);
+        this.reportBrightness(value);
         break;
       case 0x03:
         // temprature
         this.platform.log.info('< temprature', value, `(${10_000/value})`);
-        this.temprature = value ;
-        this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, 10_000 / this.temprature);
+        this.reportTemprature(value);
         break;
       default:
         this.platform.log.error('can\'t recognize state_key', state_key);
@@ -358,11 +383,42 @@ export class GVMBleLightAccessory {
     const brightness = cmd.readInt8(3);
     const temprature = cmd.readInt8(4);
     this.platform.log.debug('<< onoff', onoff, 'brightness', brightness, 'temprature', temprature, 'idonknowwhat', idonknowwhat);
-    this.on = onoff === 1;
-    this.brightness = brightness;
-    this.temprature = temprature;
+    this.reportOn(onoff === 1);
+    this.reportBrightness(brightness);
+    this.reportTemprature(temprature);
+  }
+
+  /**
+   * Reports from the light are only authoritative for the values we are not
+   * about to write ourselves: the light keeps reporting its old state until our
+   * commit went out, which would otherwise undo the user's input in HomeKit
+   * right after they made it.
+   */
+  private isPending(key: keyof DesiredState): boolean {
+    return this.desired[key] !== undefined || this.inflight[key] !== undefined;
+  }
+
+  private reportOn(on: boolean) {
+    if (this.isPending('on')) {
+      return;
+    }
+    this.on = on;
     this.service.updateCharacteristic(this.platform.Characteristic.On, this.on);
+  }
+
+  private reportBrightness(brightness: number) {
+    if (this.isPending('brightness')) {
+      return;
+    }
+    this.brightness = brightness;
     this.service.updateCharacteristic(this.platform.Characteristic.Brightness, this.brightness);
+  }
+
+  private reportTemprature(temprature: number) {
+    if (this.isPending('temprature')) {
+      return;
+    }
+    this.temprature = temprature;
     this.service.updateCharacteristic(this.platform.Characteristic.ColorTemperature, 10_000 / this.temprature);
   }
 
@@ -423,13 +479,114 @@ export class GVMBleLightAccessory {
   }
 
   async sendBuffer(buffer: Buffer){
+    return await this.sendSteps([{ buffer }]);
+  }
+
+  private async sendSteps(steps: Step[]): Promise<void> {
     try {
-      await this.enqueue(() => this.write(buffer));
+      await this.enqueue(async () => {
+        for (const [index, step] of steps.entries()) {
+          if (index > 0) {
+            // the light drops commands that arrive while it is still busy with
+            // the previous one, and they are written without a response, so
+            // there is nothing that would tell us to slow down
+            await delay(steps[index - 1].settle ?? WRITE_GAP);
+          }
+          await this.write(step.buffer);
+        }
+      });
     } catch (err) {
       this.platform.log.error(`Failed to send command to ${this.deviceId}: ${errorMessage(err)}`);
       void this.recover('sending a command failed');
       // let HomeKit show "No Response" instead of pretending the command arrived
       throw this.communicationFailure();
+    }
+  }
+
+  /**
+   * HomeKit writes the characteristics of one scene as separate, concurrent
+   * requests and it deliberately writes `On` last, assuming an accessory
+   * remembers what it received while it was off. GVM lights don't: they
+   * acknowledge the value but restore their own latched output when they power
+   * on, so brightness and color temperature written before the `On` are lost.
+   *
+   * That is why the writes are collected here instead of being forwarded one by
+   * one, and committed in an order the light actually honours.
+   */
+  private request(patch: DesiredState): Promise<void> {
+    Object.assign(this.desired, patch);
+
+    if (!this.commit) {
+      let resolve!: () => void;
+      let reject!: (err: unknown) => void;
+      const promise = new Promise<void>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      this.commit = { promise, resolve, reject };
+    }
+    const commit = this.commit;
+
+    if (this.commitTimer) {
+      clearTimeout(this.commitTimer);
+    }
+    this.commitTimer = setTimeout(() => {
+      this.commitTimer = undefined;
+      this.commit = undefined;
+      this.flush().then(commit.resolve, commit.reject);
+    }, COMMIT_DEBOUNCE);
+    // deliberately not unref'd: this timer holds a write the user is waiting for
+
+    return commit.promise;
+  }
+
+  private async flush(): Promise<void> {
+    const wanted = this.desired;
+    const { on: wantOn, brightness: wantBrightness, temprature: wantTemprature } = wanted;
+    this.desired = {};
+    this.inflight = wanted;
+
+    const steps: Step[] = [];
+    if (wantOn === false) {
+      // writing brightness/temprature to a light that is off has no effect, the
+      // values are re-asserted the next time it is switched on
+      steps.push({ buffer: onoff(0) });
+    } else {
+      if (wantOn === true) {
+        steps.push({ buffer: onoff(1), settle: POWER_ON_SETTLE });
+      }
+      // powering on always re-asserts both values, otherwise the light comes
+      // back up with whatever it was showing before it was switched off
+      if (wantOn === true || wantTemprature !== undefined) {
+        steps.push({ buffer: temprature(wantTemprature ?? this.temprature) });
+      }
+      if (wantOn === true || wantBrightness !== undefined) {
+        steps.push({ buffer: brightness(wantBrightness ?? this.brightness) });
+      }
+    }
+
+    try {
+      if (!steps.length) {
+        return;
+      }
+      this.platform.log.debug(`Committing ${steps.length} command(s) to ${this.deviceId}`);
+      await this.sendSteps(steps);
+      // the light does echo what it accepted, but relying on that echo alone
+      // leaves the cache - and with it the re-assert of the next power-on - on
+      // the old value whenever a report goes missing
+      if (wantOn !== undefined) {
+        this.on = wantOn;
+      }
+      if (wantBrightness !== undefined) {
+        this.brightness = wantBrightness;
+      }
+      if (wantTemprature !== undefined) {
+        this.temprature = wantTemprature;
+      }
+    } finally {
+      if (this.inflight === wanted) {
+        this.inflight = {};
+      }
     }
   }
 
@@ -439,28 +596,25 @@ export class GVMBleLightAccessory {
   }
 
   async sendOnOff(value: CharacteristicValue){
-    const buff = onoff(value as number);
     this.platform.log.info('> onoff', value);
-    return await this.sendBuffer(buff);
+    return await this.request({ on: value as boolean });
   }
 
   async sendBrightness(value: CharacteristicValue){
-    const buff = brightness(value as number);
     this.platform.log.info('> brightness', value);
-    return await this.sendBuffer(buff);
+    return await this.request({ brightness: value as number });
   }
 
   async sendTemprature(value: CharacteristicValue){
-    let temp = value as number;
-    // mirad range
-    temp = 10_000 / temp
-    // raw range
-    temp = Math.max(temp, 32);
-    temp = Math.min(temp, 56);
-    temp = Math.round(temp);
+    const temp = GVMBleLightAccessory.toRawTemprature(value as number);
     this.platform.log.info('> temprature', temp, `(${10_000/temp})`);
-    const buff = temprature(temp);
-    return await this.sendBuffer(buff);
+    return await this.request({ temprature: temp });
+  }
+
+  /** mired (HomeKit) to the raw 32 - 56 (3200K - 5600K) the light understands */
+  private static toRawTemprature(mired: number): number {
+    const temp = Math.round(10_000 / mired);
+    return Math.min(Math.max(temp, 32), 56);
   }
 
   async getOn(): Promise<CharacteristicValue> {

@@ -46,3 +46,7 @@ export function errorMessage(error: unknown): string {
 export function seconds(ms: number): string {
   return `${Math.round(ms / 1000)}s`;
 }
+
+export function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

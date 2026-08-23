@@ -78,24 +78,75 @@ both are optional and in milliseconds:
 ## Known Issues
 - Some communication protocal with the light is still unknown
 
-## Version histroy 
-- 1.1.7 fix: sometime device no response after interal state change of BLE server.
-- 1.1.8 fix: stops working after 10 reconnection Homebridge limitation.
-- 1.1.9 fix: a bug stops reconneceting to device after reset (Homebridge YOU SHOULD DOCUMENT LIFETIME PROPERLY!!!)
-- 1.1.10 fix: a bug stops reconneceting to device after reset try 2
-- 1.1.11 fix: a bug stops reconneceting to device after reset try 3
-- 1.1.12 fix: fix BLE device refuse to connect
-- 1.1.13 fix: try fix BLE device refuse to connect 2
-- 1.1.14 fix: try fix BLE device refuse to connect 3
-- 1.1.15 fix: try fix BLE device refuse to connect 4
-- 1.2.0 fix: try fix brightness out of control when color temperature is out of range
-- 1.2.1 fix: temp range is not correct
-- 1.2.2 chore: more log
-- 1.2.3 fix: color range specify
-- 1.2.4 fix: color range range
-- 1.2.5 fix: color int type
-- 1.2.6 fix: color space
-- 1.2.7 fix: color space restriction
-- 1.2.8 fix: color range restriction
-- 1.2.9 fix: try fix BLE device refuse to connect 5
-- 1.3.0 fix: device stops responding after a Bluetooth adapter reset, all BLE calls are now bounded by a timeout and reconnection is watchdog-driven
+## Version history
+see [CHANGELOG.md](./CHANGELOG.md)
+
+---
+
+# Development
+
+Node.js 18 or later is required. The plugin is written in [TypeScript](https://www.typescriptlang.org/);
+the repo ships settings for [VS Code](https://code.visualstudio.com/) and ESLint, so install the
+[ESLint extension](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) if you use it.
+For everything HomeKit related, the [Homebridge developer documentation](https://developers.homebridge.io/)
+lists all supported services and their characteristics.
+
+```shell
+npm install     # install dev dependencies
+npm run build   # compile src/ into dist/
+npm test        # checks the order/pacing of the BLE commands, no light or adapter needed
+npm run lint
+```
+
+### Source layout
+- [`src/platform.ts`](./src/platform.ts) - discovery, connection lifecycle and the watchdog.
+- [`src/platformAccessory.ts`](./src/platformAccessory.ts) - one light: HomeKit characteristics, the
+  commit queue and the notification parsing.
+- [`src/bufferHelper.ts`](./src/bufferHelper.ts) - the BLE frames (`4c 54 …` + CRC16/XMODEM).
+- [`config.schema.json`](./config.schema.json) - what the Homebridge UI offers, see the
+  [config schema documentation](https://developers.homebridge.io/#/config-schema).
+
+### Run it against Homebridge
+Make the local checkout visible to your global Homebridge installation and start it in debug mode:
+
+```shell
+npm link
+homebridge -D
+```
+
+To rebuild and restart Homebridge on every change, add the platform to `~/.homebridge/config.json`
+and run `npm run watch`:
+
+```json
+{
+  "platforms": [
+    {
+      "name": "GVM BLE lights",
+      "platform": "gvm-ble-lights"
+    }
+  ]
+}
+```
+
+The Homebridge startup command can be adjusted in [`nodemon.json`](./nodemon.json). Stop other running
+Homebridge instances first, they conflict over the Bluetooth adapter and the HAP port.
+
+### Release
+Given `MAJOR.MINOR.PATCH`: bump *MAJOR* for breaking changes, *MINOR* for new functionality and
+*PATCH* for backwards compatible fixes. Move the `Unreleased` section of
+[CHANGELOG.md](./CHANGELOG.md) under the new version first, then:
+
+```shell
+npm version minor        # or major / patch - commits and tags the bump
+npm publish              # runs lint, build and the tests through prepublishOnly
+git push --follow-tags
+```
+
+A GitHub release with the changelog entry should be created for every published version.
+
+Beta builds can be published for testing before a real release:
+
+```shell
+npm version prepatch --preid beta   # e.g. 1.4.1-beta.0
+npm publish --tag=beta              # installable with @beta
+```

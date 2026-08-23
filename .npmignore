@@ -1,6 +1,12 @@
 # Ignore source code
 src
 
+# tests
+test
+
+# captured plugin logs
+log
+
 # ------------- Defaults ------------- #
 
 # gitHub actions
