@@ -2,6 +2,23 @@
 
 All notable changes to this plugin are documented here.
 
+## 1.4.1
+
+### Fixed
+
+- The light was never found again after a connect attempt timed out on macOS,
+  leaving the plugin scanning forever (`Not every device is connected, making
+  sure we are scanning` / `Already scanning` every poll) until Homebridge was
+  restarted or the light was power-cycled.
+
+  The macOS bindings of `@abandonware/noble` do not implement `cancelConnect`;
+  the call threw and the disconnect that should have followed was skipped. As
+  CoreBluetooth never times out a pending connect on its own, it completed
+  behind the plugin's back and the connected light stopped advertising.
+  Failed connects now always cancel the pending OS connection, and the
+  watchdog releases a peripheral that is still connected at the OS level while
+  the plugin considers it idle.
+
 ## 1.4.0
 
 ### Fixed

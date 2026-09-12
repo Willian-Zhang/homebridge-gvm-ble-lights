@@ -212,8 +212,17 @@ export class GVMBleLightAccessory {
   private async abort(peripheral: Peripheral) {
     this.detachCharacteristic();
     try {
-      // settles the connect promise noble would otherwise leak
+      // settles the connect promise noble would otherwise leak. The macOS
+      // bindings don't implement cancelConnect and throw *after* the promise
+      // has been settled, so this must not prevent the disconnect below.
       peripheral.cancelConnect();
+    } catch (err) {
+      this.platform.log.debug('cancelConnect failed:', errorMessage(err));
+    }
+    try {
+      // CoreBluetooth never times out a pending connect on its own. Unless it
+      // is cancelled here it completes later behind our back, and a connected
+      // light stops advertising - so it would never be discovered again.
       if (peripheral.state !== 'disconnected') {
         await withTimeout(peripheral.disconnectAsync(), this.platform.timeout, `disconnect ${this.deviceId}`);
       }
@@ -253,8 +262,16 @@ export class GVMBleLightAccessory {
   healthCheck(): boolean {
     const since = Date.now() - this.statusSince;
     switch (this.connectionStatus) {
-      case 'idle':
+      case 'idle': {
+        // an idle handler must not hold an OS-level connection: the light stops
+        // advertising while connected, so rediscovery could never happen
+        const state = this.peripheral?.state;
+        if (state === 'connected' || state === 'connecting') {
+          this.platform.log.warn(`${this.deviceId} is idle but still ${state} at the OS level, dropping the connection`);
+          void this.recover(`stale ${state} peripheral`);
+        }
         return false;
+      }
       case 'connecting':
         // every BLE call is bounded, so connecting cannot take forever anymore.
         // if it still does, force a fresh start instead of waiting forever.
