@@ -78,7 +78,10 @@ from the code and has already cost debugging time.
   one byte per register `0x00`-`0x03` (`Register` in `src/bufferHelper.ts`), nothing more
   (checked on raw frames). The light sends it unprompted every ~5 s; it is *not* the reply
   to `infoAll()`, which is answered with `53 00 00 02 20 38` (presumably the 3200-5600 K
-  range). Register `0x01` is the channel selected on the light. Changing the channel on the
+  range) - but not reliably: right after connecting it answered only ~2 of ~15 times, the
+  watchdog's later probes nearly always. Since the status reports are echoed the light never
+  goes quiet, so the probe and its answer are rare. Register `0x01` is the channel selected
+  on the light. Changing the channel on the
   light drops the BLE link; the light advertises again ~1 min later and rediscovery
   reconnects it.
 - What the official GVM app does (PacketLogger capture, 2026-10-19): it answers every status

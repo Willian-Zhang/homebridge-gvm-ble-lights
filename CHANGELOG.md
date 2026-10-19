@@ -2,7 +2,7 @@
 
 All notable changes to this plugin are documented here.
 
-## Unreleased
+## 1.6.0
 
 ### Changed
 
