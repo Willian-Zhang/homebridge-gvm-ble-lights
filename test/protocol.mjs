@@ -6,11 +6,31 @@
  */
 import assert from 'node:assert/strict';
 import { GVMBleLightAccessory } from '../dist/platformAccessory.js';
-import { CRCBuffer, parseStatus, Register } from '../dist/bufferHelper.js';
+import { CRCBuffer, parseStatus, heartbeatReply, infoAll, onoff, brightness, temprature } from '../dist/bufferHelper.js';
 
 /** full status reports captured from a light, before and after switching it from channel 1 to 2 */
 const CHANNEL_1 = Buffer.from('4c5409002003010114202d2e', 'hex');
 const CHANNEL_2 = Buffer.from('4c540900200301021e34c900', 'hex');
+
+/**
+ * captured between the GVM app and a light (PacketLogger, 2026-10-19): a status
+ * report (on, channel 1, 15 %, 4400K) and the app's answer to it
+ */
+const REPORT = Buffer.from('4c540900200301010f2c332b', 'hex');
+const APP_REPLY = Buffer.from('4c540900204801010f2ccebc', 'hex');
+/** the light's answer to the app's (and our) `infoAll()` */
+const INFO_REPLY = Buffer.from('4c540a00205300000220381c62', 'hex');
+/** the light confirming single register writes: brightness 14, channel 2 */
+const BRIGHTNESS_14 = Buffer.from('4c540800200200020edf1d', 'hex');
+const CHANNEL_SET_2 = Buffer.from('4c54080020020001024bc2', 'hex');
+/** commands the app wrote */
+const APP_COMMANDS = {
+  infoAll: '4c5409000053000001009474',
+  off: '4c540900205700000100287a',
+  on: '4c540900205700000101385b',
+  brightness100: '4c5409002057000201646a38',
+  temprature56: '4c540900205700030138c671',
+};
 
 /** frames a frame from its body, i.e. adds the header, the length and the CRC */
 function frame(body) {
@@ -18,9 +38,10 @@ function frame(body) {
   return Buffer.concat([unsigned, CRCBuffer(unsigned)]);
 }
 
-function stubLight() {
+function stubLight({ connected = false } = {}) {
   const updates = [];
   const logs = [];
+  const writes = [];
   const chainable = () => {
     const stub = {};
     for (const name of ['removeOnGet', 'removeOnSet', 'onSet', 'onGet', 'setProps', 'updateCharacteristic']) {
@@ -57,11 +78,18 @@ function stubLight() {
 
   const light = new GVMBleLightAccessory(platform, accessory);
   light.peripheral = { id: 'test-light', state: 'connected' };
+  if (connected) {
+    light.char = { writeAsync: async (buffer) => writes.push(buffer.toString('hex')) };
+    light.connectionStatus = 'connected';
+  }
   // drop the accessory information the constructor sets
   updates.length = 0;
   logs.length = 0;
   return {
     light,
+    writes,
+    /** waits until everything the light queued has been written */
+    settled: () => light.queue,
     /** @returns what reached HomeKit and the log since the last call */
     taken() {
       const result = { updates: [...updates], logs: [...logs] };
@@ -116,11 +144,55 @@ ok('re-framing the captured reports reproduces them, CRC included');
 }
 
 {
-  // synthetic: no single-register channel update has been seen from a light yet
   const { light, taken } = stubLight();
-  light.onNotification(frame(Buffer.from([0x00, 0x20, 0x02, 0x00, Register.CHANNEL, 0x03])));
-  assert.deepEqual(taken(), { updates: [], logs: ['info: test-light: on channel 3'] });
-  ok('a single-register channel update is understood');
+  light.onNotification(CHANNEL_SET_2);
+  assert.deepEqual(taken(), { updates: [], logs: ['info: test-light: on channel 2'] });
+  light.onNotification(BRIGHTNESS_14);
+  assert.deepEqual(taken(), { updates: ['Brightness=14'], logs: ['info: < brightness 14'] });
+  ok('the captured single-register confirmations are understood');
+}
+
+{
+  assert.equal(infoAll().toString('hex'), APP_COMMANDS.infoAll);
+  assert.equal(onoff(0).toString('hex'), APP_COMMANDS.off);
+  assert.equal(onoff(1).toString('hex'), APP_COMMANDS.on);
+  assert.equal(brightness(100).toString('hex'), APP_COMMANDS.brightness100);
+  assert.equal(temprature(56).toString('hex'), APP_COMMANDS.temprature56);
+  ok('our commands are byte for byte what the GVM app sends');
+}
+
+{
+  assert.deepEqual(heartbeatReply(statusBody(REPORT)), APP_REPLY);
+  const { light, taken, writes, settled } = stubLight({ connected: true });
+  light.onNotification(REPORT);
+  await settled();
+  assert.deepEqual(writes, [APP_REPLY.toString('hex')]);
+  assert.deepEqual(taken().updates, ['On=true', 'Brightness=15', `ColorTemperature=${10_000 / 44}`]);
+  ok('a status report is answered like the GVM app does');
+}
+
+{
+  const { light, writes, settled } = stubLight();
+  light.onNotification(REPORT);
+  await settled();
+  assert.deepEqual(writes, [], 'not connected yet');
+
+  const busy = stubLight({ connected: true });
+  const command = busy.light.sendBuffer(onoff(0));
+  busy.light.onNotification(REPORT);
+  await command;
+  await busy.settled();
+  assert.deepEqual(busy.writes, [APP_COMMANDS.off], 'the echo would carry the state from before the command');
+  ok('a status report is not answered while not connected or while a command is queued');
+}
+
+{
+  const { light, taken, writes, settled } = stubLight({ connected: true });
+  light.onNotification(INFO_REPLY);
+  await settled();
+  assert.deepEqual(taken(), { updates: [], logs: [] }, 'not reported as unrecognized');
+  assert.deepEqual(writes, []);
+  ok('the reply to infoAll() is understood');
 }
 
 {

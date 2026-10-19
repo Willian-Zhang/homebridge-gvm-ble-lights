@@ -2,6 +2,26 @@
 
 All notable changes to this plugin are documented here.
 
+## Unreleased
+
+### Changed
+
+- Every status report of the light is answered the way the official GVM app
+  does. A capture of the app's Bluetooth traffic showed it echoing each report
+  (sent about every 5s) within milliseconds, with the same values and `48`
+  in place of `03`; the plugin never answered. The link stays up without it,
+  so it is a precaution in case the light relies on it for something else.
+  The echo is skipped while a command is on the wire, since it would carry the
+  values from before that command.
+
+### Fixed
+
+- The light's answer to the request sent after connecting is no longer logged
+  as `can't recognize state_cat 83`. That request was taken for a status
+  request, but the same capture showed the light answering it with what
+  appears to be its color temperature range (`20 38`, 3200K - 5600K); the
+  status report only ever arrives on its own.
+
 ## 1.5.0
 
 ### Changed

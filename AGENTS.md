@@ -74,11 +74,19 @@ from the code and has already cost debugging time.
 - The lights write without response and drop what they can't keep up with; commands are
   paced and ordered (`On` first) - see the 1.4.0 changelog entry before touching the
   commit queue.
-- The full status report (reply to `infoAll()`) is `4c54 09 0020 03 <on> <channel>
-  <brightness> <temp> <crc16>` - one byte per register `0x00`-`0x03` (`Register` in
-  `src/bufferHelper.ts`), nothing more (checked on raw frames). Register `0x01` is the channel selected on the light. Changing the
-  channel on the light drops the BLE link; the light advertises again ~1 min later and
-  rediscovery reconnects it.
+- The full status report is `4c54 09 0020 03 <on> <channel> <brightness> <temp> <crc16>` -
+  one byte per register `0x00`-`0x03` (`Register` in `src/bufferHelper.ts`), nothing more
+  (checked on raw frames). The light sends it unprompted every ~5 s; it is *not* the reply
+  to `infoAll()`, which is answered with `53 00 00 02 20 38` (presumably the 3200-5600 K
+  range). Register `0x01` is the channel selected on the light. Changing the channel on the
+  light drops the BLE link; the light advertises again ~1 min later and rediscovery
+  reconnects it.
+- What the official GVM app does (PacketLogger capture, 2026-10-19): it answers every status
+  report within ms with the same values and `48` in place of `03` (`heartbeatReply()`). It
+  writes the channel like any other register (`57 00 01 01 <n>`) and the link stays up.
+  Its scenes are presets stored in the app, sent as plain register writes, preceded by
+  `57 00 06 01 01`, which the light never confirms. To capture again: Apple's *Bluetooth
+  logging profile* is required, without it PacketLogger saves an empty trace.
 
 ## Releasing
 

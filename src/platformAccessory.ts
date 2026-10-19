@@ -2,7 +2,7 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { BleLights } from './platform.js';
 import { Characteristic, DisconnectReason, Peripheral } from '@stoprocent/noble';
-import { CRCBuffer, onoff, start_with, brightness, temprature, infoAll, parseStatus, Register } from './bufferHelper.js';
+import { CRCBuffer, onoff, start_with, brightness, temprature, infoAll, parseStatus, heartbeatReply, Register } from './bufferHelper.js';
 import { delay, errorMessage, seconds, withTimeout } from './util.js';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected';
@@ -16,7 +16,7 @@ const CRC_LENGTH = 2;
 
 /** connect attempts per discovery, afterwards we wait for the light to show up again */
 const CONNECT_ATTEMPTS = 3;
-/** the light reports its state roughly every 5s, so ask for it when it went quiet for this long */
+/** the light reports its state roughly every 5s, so probe it when it went quiet for this long */
 const PROBE_AFTER = 20_000;
 /** ... and treat the link as dead when even the probe stays unanswered */
 const DEAD_AFTER = 60_000;
@@ -66,6 +66,8 @@ export class GVMBleLightAccessory {
   private lastSeen = 0;
   /** all BLE operations of one device are serialized through this chain */
   private queue: Promise<unknown> = Promise.resolve();
+  /** operations in the queue that have not finished yet */
+  private queued = 0;
   private recovering = false;
 
   private desired: DesiredState = {};
@@ -379,8 +381,9 @@ export class GVMBleLightAccessory {
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    this.queued++;
     const run = this.queue.then(task, task);
-    this.queue = run.catch(() => undefined);
+    this.queue = run.catch(() => undefined).finally(() => this.queued--);
     return run;
   }
 
@@ -428,6 +431,43 @@ export class GVMBleLightAccessory {
     this.reportOn(on);
     this.reportBrightness(brightness);
     this.reportTemprature(temprature);
+    this.answerStatusReport(cmd);
+  }
+
+  /**
+   * Echoes a status report like the GVM app does, see `heartbeatReply()`. The
+   * echo carries the values of the report, so it is skipped while a command is
+   * queued or on the wire: sent after that command it would hold values the
+   * light no longer has. Answering is best effort, a failing link is detected
+   * by the commands and the watchdog.
+   */
+  private answerStatusReport(report: Buffer) {
+    if (!this.isConnected() || this.queued > 0) {
+      return;
+    }
+    const reply = heartbeatReply(report);
+    this.enqueue(async () => {
+      await this.write(reply);
+      // a command right behind the reply would arrive while the light is still busy
+      await delay(WRITE_GAP);
+    }).catch((err) => this.platform.log.debug('Answering the status report failed:', errorMessage(err)));
+  }
+
+  /**
+   * The answer to `infoAll()`: `53 00 <register> <count> <values>`, so far only
+   * seen as `53 00 00 02 20 38`, presumably the color temperature range.
+   */
+  onInfoReply(cmd: Buffer) {
+    const values = cmd.subarray(4);
+    if (cmd.length < 4 || values.length !== cmd.readUInt8(3)) {
+      this.platform.log.debug('<< unexpected info reply', cmd.toString('hex'));
+      return;
+    }
+    if (values.length === 2) {
+      this.platform.log.debug(`<< ${this.deviceId}: color temperature range ${values[0] * 100}K - ${values[1] * 100}K`);
+    } else {
+      this.platform.log.debug('<< info reply', values.toString('hex'));
+    }
   }
 
   /**
@@ -521,6 +561,9 @@ export class GVMBleLightAccessory {
         case 0x03:
           // report all states
           this.onStateChangeAll(cmd);
+          break;
+        case 0x53:
+          this.onInfoReply(cmd);
           break;
         default:
           this.platform.log.info('can\'t recognize state_cat', state_cat, cmd.toString('hex'));
