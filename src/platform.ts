@@ -158,7 +158,7 @@ export class BleLights implements DynamicPlatformPlugin {
     if (state === 'poweredOn') {
       await this.startScanning();
     } else if (state === 'unauthorized') {
-      this.log.error('BLE device not authorized, try add this app to the whitelist');
+      this.logUnauthorized();
     } else {
       // resetting / poweredOff / unsupported: every handle we are holding is
       // dead now. Talking to them (not even to disconnect them) is pointless -
@@ -170,6 +170,21 @@ export class BleLights implements DynamicPlatformPlugin {
       for (const handler of this.handlers.values()) {
         handler.invalidate(`adapter is ${state}`);
       }
+    }
+  }
+
+  /**
+   * Bluetooth access belongs to the binary running Homebridge, i.e. node. As a
+   * background service it never gets the macOS permission prompt, so the log is
+   * the only place that can tell which file to allow.
+   */
+  private logUnauthorized() {
+    this.log.error(`BLE device not authorized: ${process.execPath} has no Bluetooth access`);
+    if (process.platform === 'darwin') {
+      this.log.error('Add exactly that file in System Settings -> Privacy & Security -> Bluetooth, then restart Homebridge.');
+      this.log.error("Homebrew's node loses this permission on every upgrade, see the plugin README.");
+    } else {
+      this.log.error('See the plugin README for the Bluetooth permissions node needs, then restart Homebridge.');
     }
   }
 

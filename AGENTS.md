@@ -44,6 +44,17 @@ from the code and has already cost debugging time.
 - A terminal (and anything it spawns, e.g. a quick noble test script) gets adapter
   state `unauthorized` unless the terminal app has Bluetooth permission in System
   Settings. Check that before concluding the light is not advertising.
+- The Homebridge service itself gets `unauthorized` when the `node` running it has no
+  Bluetooth permission; as a launchd service it never sees the prompt. TCC stores the
+  client path plus a code requirement. For an unsigned binary (Homebrew's `node`) that
+  requirement is its `cdhash`, so every `brew upgrade` revokes the permission silently
+  and it only shows after the next restart. Official nodejs.org builds get a Developer ID
+  requirement (team `HX7739G8FX`) that covers later builds at the same path. TCC records
+  the resolved binary (`process.execPath`, e.g. `/usr/local/Cellar/node@22/<version>/bin/node`),
+  not the `/usr/local/opt` symlink in the launchd plist. Granting access emits no
+  `stateChange`: Homebridge has to be restarted. With Full Disk Access for the terminal,
+  `sqlite3 ~/Library/Application\ Support/com.apple.TCC/TCC.db "select client, auth_value
+  from access where service='kTCCServiceBluetoothAlways'"` lists the grants (2 = allowed).
 - The lights write without response and drop what they can't keep up with; commands are
   paced and ordered (`On` first) - see the 1.4.0 changelog entry before touching the
   commit queue.

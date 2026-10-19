@@ -30,10 +30,16 @@ exapmle:
 },
 ```
 
-- whitelist node for BLE accesss
+- give node Bluetooth access
   - macOS:
-    - head to Preferences -> Security & Privacy -> Privacy -> Bluetooth
-    - add node to the whitelist
+    - open System Settings -> Privacy & Security -> Bluetooth, add the `node` binary that runs Homebridge
+      and restart Homebridge. Homebridge runs in the background and never gets the permission prompt;
+      when access is missing, the plugin logs the exact path to add.
+    - for a binary that isn't signed by its developer, macOS ties the permission to that exact build.
+      Homebrew's `node` is such a binary, so every `brew upgrade` that touches it silently revokes the
+      permission and the light stops working after the next restart. The official builds from
+      [nodejs.org](https://nodejs.org) are signed by the Node.js Foundation, so the permission keeps
+      covering updates installed at the same path.
   - linux:
     - [check here](https://www.npmjs.com/package/@abandonware/noble#linux)
   - windows: 

@@ -2,6 +2,20 @@
 
 All notable changes to this plugin are documented here.
 
+## Unreleased
+
+### Changed
+
+- When Bluetooth access is denied, the log names the `node` binary that needs
+  it and where to allow it, instead of "try add this app to the whitelist".
+  Homebridge runs as a background service and never gets the macOS permission
+  prompt, and macOS ties the permission of a binary that isn't signed by its
+  developer to that exact build. Homebrew's `node` is such a binary, so a
+  `brew upgrade` silently revoked the permission and the plugin only reported
+  `unauthorized` after the next restart, without saying which file to allow.
+  Granting it doesn't change the adapter state on its own, Homebridge has to
+  be restarted.
+
 ## 1.4.2
 
 ### Fixed
