@@ -2,6 +2,21 @@
 
 All notable changes to this plugin are documented here.
 
+## 1.4.2
+
+### Fixed
+
+- A scan that stopped producing discoveries is restarted. The plugin believed
+  it was scanning for 13 hours without a single `discover` event (not even the
+  light's own advertisement), while the light was not connected to the Mac at
+  the OS level. `scanning` is only cleared by noble's `scanStop` event, and
+  CoreBluetooth can stop scanning silently without one (observed after the Mac
+  slept), so the watchdog now restarts the scan when nothing at all was
+  discovered for 5 minutes while a device is still missing. This also drops
+  noble's per-scan duplicate filter, which suppressed the light's advertisements
+  for the rest of a scan session once they had been ignored while the handler
+  was busy.
+
 ## 1.4.1
 
 ### Fixed

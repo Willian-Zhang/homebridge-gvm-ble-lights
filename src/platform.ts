@@ -3,7 +3,7 @@ import noble, { Peripheral } from '@abandonware/noble';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { GVMBleLightAccessory } from './platformAccessory.js';
-import { errorMessage, withTimeout } from './util.js';
+import { errorMessage, seconds, withTimeout } from './util.js';
 
 /** the (HID) service the GVM lights advertise */
 const SERVICE_UUID = '1812';
@@ -11,6 +11,11 @@ const SERVICE_UUID = '1812';
 const DEFAULT_TIMEOUT = 10_000;
 /** how often every device is checked for being alive */
 const DEFAULT_POLL_INTERVAL = 15_000;
+/**
+ * a scan that has not produced a single `discover` event for this long is
+ * presumed dead and restarted, see `healthCheck()`
+ */
+const STALE_SCAN_AFTER = 5 * 60_000;
 
 export type BleLightsConfig = PlatformConfig & {
   devices?: { name: string; id?: string }[];
@@ -38,6 +43,8 @@ export class BleLights implements DynamicPlatformPlugin {
   private adapterState: string = noble._state;
   private scanning = false;
   private scanRequest?: Promise<void>;
+  /** when the current scan started or last produced a `discover` event */
+  private lastScanActivity = 0;
   private healthCheckTimer?: NodeJS.Timeout;
   /** discoveries are only processed once the cached accessories are restored */
   private ready = false;
@@ -116,6 +123,7 @@ export class BleLights implements DynamicPlatformPlugin {
     });
     noble.on('scanStart', () => {
       this.scanning = true;
+      this.lastScanActivity = Date.now();
       this.log.debug('Scan started');
     });
     noble.on('scanStop', () => {
@@ -123,6 +131,7 @@ export class BleLights implements DynamicPlatformPlugin {
       this.log.debug('Scan stopped');
     });
     noble.on('discover', (peripheral: Peripheral) => {
+      this.lastScanActivity = Date.now();
       this.onDiscover(peripheral).catch((err) => this.log.error('Failed to handle discovered peripheral:', errorMessage(err)));
     });
     noble.on('warning', (message: string) => this.log.debug('BLE warning:', message));
@@ -249,10 +258,27 @@ export class BleLights implements DynamicPlatformPlugin {
         needsScanning = true;
       }
     }
-    if (needsScanning) {
-      this.log.debug('Not every device is connected, making sure we are scanning');
-      void this.startScanning();
+    if (!needsScanning) {
+      return;
     }
+    const silence = Date.now() - this.lastScanActivity;
+    if (this.scanning && !this.scanRequest && silence > STALE_SCAN_AFTER) {
+      // CoreBluetooth can stop scanning silently (observed after the Mac
+      // slept) without noble ever emitting `scanStop`. `scanning` then stays
+      // true forever and nothing would ever be discovered again.
+      this.log.warn(`Nothing discovered for ${seconds(silence)} while scanning, restarting the scan`);
+      void this.restartScanning();
+      return;
+    }
+    this.log.debug('Not every device is connected, making sure we are scanning');
+    void this.startScanning();
+  }
+
+  private async restartScanning() {
+    // force the flag: if the scan really died, `scanStop` won't come either
+    await this.stopScanning();
+    this.scanning = false;
+    await this.startScanning();
   }
 
   private async shutdown() {

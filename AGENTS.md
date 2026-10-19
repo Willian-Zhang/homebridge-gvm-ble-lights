@@ -35,6 +35,15 @@ from the code and has already cost debugging time.
   and CoreBluetooth silently drops calls made on them. Don't disconnect them, just
   `invalidate()` and wait for `poweredOn` (see `onAdapterStateChange`).
 - `scanning` is only set from noble's `scanStart`/`scanStop` events, never guessed.
+  The one exception is `restartScanning()`: CoreBluetooth can stop scanning silently
+  (seen after the Mac slept) and then no `scanStop` ever arrives, so the watchdog
+  restarts a scan that produced no `discover` event at all for `STALE_SCAN_AFTER`.
+- noble emits `discover` only once per peripheral per scan session (`allowDuplicates`
+  is off). An advertisement ignored while the handler was busy is therefore not
+  repeated until the scan is restarted.
+- A terminal (and anything it spawns, e.g. a quick noble test script) gets adapter
+  state `unauthorized` unless the terminal app has Bluetooth permission in System
+  Settings. Check that before concluding the light is not advertising.
 - The lights write without response and drop what they can't keep up with; commands are
   paced and ordered (`On` first) - see the 1.4.0 changelog entry before touching the
   commit queue.
