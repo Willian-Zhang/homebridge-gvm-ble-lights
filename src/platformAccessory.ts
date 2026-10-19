@@ -2,10 +2,17 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { BleLights } from './platform.js';
 import { Characteristic, DisconnectReason, Peripheral } from '@stoprocent/noble';
-import { CRCBuffer, onoff, start_with, brightness, temprature, infoAll } from './bufferHelper.js';
+import { CRCBuffer, onoff, start_with, brightness, temprature, infoAll, parseStatus, Register } from './bufferHelper.js';
 import { delay, errorMessage, seconds, withTimeout } from './util.js';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected';
+
+/** every frame starts with "LT" */
+const FRAME_HEADER = Buffer.from([0x4C, 0x54]);
+/** the header, then one byte for the length of the rest of the frame */
+const FRAME_PREFIX = FRAME_HEADER.length + 1;
+/** every frame ends with a CRC16 over everything before it */
+const CRC_LENGTH = 2;
 
 /** connect attempts per discovery, afterwards we wait for the light to show up again */
 const CONNECT_ATTEMPTS = 3;
@@ -45,6 +52,9 @@ export class GVMBleLightAccessory {
    * projected value range for mired: 312 - 178
    */
   private temprature: number = 32;
+
+  /** channel selected on the light, kept across reconnects since changing it drops the link */
+  private channel?: number;
 
   private peripheral: Peripheral | undefined;
   private char: Characteristic | undefined;
@@ -375,21 +385,25 @@ export class GVMBleLightAccessory {
   }
 
   onStateChange(cmd: Buffer) {
-    const state_key = cmd.readInt8(2);
-    const value = cmd.readInt8(3)
+    if (cmd.length < 4) {
+      this.platform.log.error('state change too short', cmd.toString('hex'));
+      return;
+    }
+    const state_key = cmd.readUInt8(2);
+    const value = cmd.readUInt8(3);
     switch (state_key) {
-      case 0x00:
-        // onoff
+      case Register.ON:
         this.platform.log.info('< onoff', value);
         this.reportOn(value === 1);
         break;
-      case 0x02:
-        // brightness
+      case Register.CHANNEL:
+        this.reportChannel(value);
+        break;
+      case Register.BRIGHTNESS:
         this.platform.log.info('< brightness', value);
         this.reportBrightness(value);
         break;
-      case 0x03:
-        // temprature
+      case Register.TEMPRATURE:
         this.platform.log.info('< temprature', value, `(${10_000/value})`);
         this.reportTemprature(value);
         break;
@@ -400,14 +414,37 @@ export class GVMBleLightAccessory {
   }
 
   onStateChangeAll(cmd: Buffer) {
-    const onoff = cmd.readInt8(1);
-    const idonknowwhat = cmd.readInt8(2);
-    const brightness = cmd.readInt8(3);
-    const temprature = cmd.readInt8(4);
-    this.platform.log.debug('<< onoff', onoff, 'brightness', brightness, 'temprature', temprature, 'idonknowwhat', idonknowwhat);
-    this.reportOn(onoff === 1);
+    const status = parseStatus(cmd);
+    if (!status) {
+      this.platform.log.error('status report too short', cmd.toString('hex'));
+      return;
+    }
+    const { on, channel, brightness, temprature } = status;
+    this.platform.log.debug('<< onoff', on ? 1 : 0, 'brightness', brightness, 'temprature', temprature, 'channel', channel);
+    if (cmd.length > 1 + Register.TEMPRATURE + 1) {
+      this.platform.log.debug('<< unparsed state bytes', cmd.subarray(1 + Register.TEMPRATURE + 1).toString('hex'));
+    }
+    this.reportChannel(channel);
+    this.reportOn(on);
     this.reportBrightness(brightness);
     this.reportTemprature(temprature);
+  }
+
+  /**
+   * HomeKit has no characteristic for the channel, so it only goes to the log.
+   * The light may come back with a different brightness and color temperature
+   * after a channel change, this explains why.
+   */
+  private reportChannel(channel: number) {
+    if (channel === this.channel) {
+      return;
+    }
+    if (this.channel === undefined) {
+      this.platform.log.info(`${this.deviceId}: on channel ${channel}`);
+    } else {
+      this.platform.log.info(`${this.deviceId}: channel changed from ${this.channel} to ${channel}`);
+    }
+    this.channel = channel;
   }
 
   /**
@@ -447,30 +484,36 @@ export class GVMBleLightAccessory {
   onNotification(data: Buffer) {
     let start = 0;
     const buffer = Buffer.from(data);
+    // a notification may hold several frames: "LT" <len> <len bytes, the last two a CRC>
     while (start < buffer.length) {
-      if (!start_with(buffer, Buffer.from([0x4C, 0x54]))) {
-        this.platform.log.error('header error, buffer', buffer);
-      }
-      start += 2;
-      const len = buffer.readInt8(start);
-      if (start + len > buffer.length) {
-        this.platform.log.error(`len error, reading ${len} bytes, rests`, buffer.slice(start));
+      const rest = buffer.subarray(start);
+      if (!start_with(rest, FRAME_HEADER)) {
+        // without a valid header the frame boundaries are lost, drop the rest
+        this.platform.log.error('header error, rests', rest.toString('hex'));
         return;
       }
-      start += 1;
-      let cmd = buffer.subarray(start, start + len);
-      const crc = CRCBuffer(buffer.subarray(start - 3, start + len - 2));
-      if (crc.compare(cmd.subarray(len - 2)) != 0) {
-        this.platform.log.error(`crc error, crc-cmd, ${cmd.subarray(len - 2).toString()}, crc, ${crc}`);
+      const len = rest.length > FRAME_HEADER.length ? rest.readUInt8(FRAME_HEADER.length) : 0;
+      if (len < CRC_LENGTH || FRAME_PREFIX + len > rest.length) {
+        this.platform.log.error(`len error, reading ${len} bytes, rests`, rest.toString('hex'));
         return;
       }
-      cmd = cmd.subarray(0, len - 2);
+      start += FRAME_PREFIX + len;
 
-      if (!start_with(cmd, Buffer.from([0x00, 0x20]))) {
-        this.platform.log.error('can\'t recognize cmd', cmd);
+      const frame = rest.subarray(0, FRAME_PREFIX + len);
+      const received = frame.subarray(frame.length - CRC_LENGTH);
+      const crc = CRCBuffer(frame.subarray(0, frame.length - CRC_LENGTH));
+      if (crc.compare(received) != 0) {
+        this.platform.log.error(`crc error, frame ${frame.toString('hex')}, expected crc ${crc.toString('hex')}`);
+        return;
+      }
+
+      let cmd = frame.subarray(FRAME_PREFIX, frame.length - CRC_LENGTH);
+      if (!start_with(cmd, Buffer.from([0x00, 0x20])) || cmd.length < 3) {
+        this.platform.log.error('can\'t recognize cmd', cmd.toString('hex'));
+        continue;
       }
       cmd = cmd.subarray(2);
-      const state_cat = cmd.readInt8(0);
+      const state_cat = cmd.readUInt8(0);
       switch (state_cat) {
         case 0x02:
           this.onStateChange(cmd);
@@ -480,10 +523,9 @@ export class GVMBleLightAccessory {
           this.onStateChangeAll(cmd);
           break;
         default:
-          this.platform.log.info('can\'t recognize state_cat', state_cat, cmd);
+          this.platform.log.info('can\'t recognize state_cat', state_cat, cmd.toString('hex'));
           break;
       }
-      start += len;
     }
   }
 

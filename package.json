@@ -22,7 +22,7 @@
     "lintFix": "eslint src/**/*.ts --max-warnings=0 --fix",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
-    "test": "npm run build && node test/commit-order.mjs && node test/noble-lifecycle.mjs",
+    "test": "npm run build && node test/commit-order.mjs && node test/protocol.mjs && node test/noble-lifecycle.mjs",
     "prepublishOnly": "npm run lint && npm test"
   },
   "keywords": [

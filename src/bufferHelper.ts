@@ -1,6 +1,41 @@
 import CRC16 from 'crc/calculators/crc16xmodem';
 type UInt8 = number & { __brand: "uint8" };
 
+/** the light's registers, also the order of the values in a full status report */
+export const Register = {
+    ON: 0x00,
+    /** the channel selected on the light, only ever reported */
+    CHANNEL: 0x01,
+    BRIGHTNESS: 0x02,
+    TEMPRATURE: 0x03,
+} as const;
+
+export type Status = {
+    on: boolean;
+    channel: number;
+    brightness: number;
+    /** raw device value, 32 - 56 */
+    temprature: number;
+};
+
+/**
+ * Parses the body of a full status report (the reply to `infoAll()`), without
+ * the `00 20` prefix and the CRC: `03 <on> <channel> <brightness> <temprature>`.
+ * @returns undefined when the report is too short
+ */
+export function parseStatus(cmd: Buffer): Status | undefined {
+    const values = cmd.subarray(1);
+    if (values.length <= Register.TEMPRATURE) {
+        return undefined;
+    }
+    return {
+        on: values[Register.ON] === 1,
+        channel: values[Register.CHANNEL],
+        brightness: values[Register.BRIGHTNESS],
+        temprature: values[Register.TEMPRATURE],
+    };
+}
+
 
 export function CRCBuffer(data: Buffer) {
     const crc = Buffer.alloc(2);
@@ -19,17 +54,17 @@ export function formCmd(subcmd: UInt8, value: UInt8) {
 
 export function onoff(value: number) {
     // 0x00 - 0x01
-    return formCmd(0x00 as UInt8, value as UInt8);
+    return formCmd(Register.ON as UInt8, value as UInt8);
 }
 
 export function brightness(value: number) {
     // 0x00 - 0x64
-    return formCmd(0x02 as UInt8, value as UInt8);
+    return formCmd(Register.BRIGHTNESS as UInt8, value as UInt8);
 }
 
 export function temprature(value: number) {
     // 0x20 - 0x38 (32-56) 3200k - 5600k
-    return formCmd(0x03 as UInt8, value as UInt8);
+    return formCmd(Register.TEMPRATURE as UInt8, value as UInt8);
 }
 
 export function start_with(buffer: Buffer, check_buffer: Buffer) {

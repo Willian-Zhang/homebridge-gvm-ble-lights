@@ -8,7 +8,8 @@ from the code and has already cost debugging time.
 
 - `npm run build`, `npm run lint` (`--max-warnings=0`) and `npm test` must pass. The
   tests don't need a light or an adapter; `test/noble-lifecycle.mjs` runs a light
-  against noble's real JS layer (`@stoprocent/noble/lib/noble.js`) on fake bindings.
+  against noble's real JS layer (`@stoprocent/noble/lib/noble.js`) on fake bindings;
+  `test/protocol.mjs` parses frames captured from a real light - add new captures there.
 - The BLE library is `@stoprocent/noble` because it ships prebuilt binaries;
   `@abandonware/noble` (used up to 1.4.2) was compiled with node-gyp on every install
   and upgrade. Don't switch to a dependency that needs a compiler.
@@ -73,6 +74,11 @@ from the code and has already cost debugging time.
 - The lights write without response and drop what they can't keep up with; commands are
   paced and ordered (`On` first) - see the 1.4.0 changelog entry before touching the
   commit queue.
+- The full status report (reply to `infoAll()`) is `4c54 09 0020 03 <on> <channel>
+  <brightness> <temp> <crc16>` - one byte per register `0x00`-`0x03` (`Register` in
+  `src/bufferHelper.ts`), nothing more (checked on raw frames). Register `0x01` is the channel selected on the light. Changing the
+  channel on the light drops the BLE link; the light advertises again ~1 min later and
+  rediscovery reconnects it.
 
 ## Releasing
 

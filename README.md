@@ -12,7 +12,9 @@
 - Set the color temperature of the light
 
 ## Not Supported Features
-- Channel control (I have got only one channel light, so I can't test this feature)
+- Channel control: the channel selected on the light is shown in the log, but HomeKit has no way to
+  show or change it. Changing it on the light drops the Bluetooth link; the plugin reconnects on its own
+  about a minute later.
 - Scene control
   
 ## Usage
@@ -100,7 +102,7 @@ lists all supported services and their characteristics.
 ```shell
 npm install     # install dev dependencies
 npm run build   # compile src/ into dist/
-npm test        # checks the order/pacing of the BLE commands, no light or adapter needed
+npm test        # BLE command order/pacing, parsing of the light's reports; no light or adapter needed
 npm run lint
 ```
 
@@ -108,7 +110,8 @@ npm run lint
 - [`src/platform.ts`](./src/platform.ts) - discovery, connection lifecycle and the watchdog.
 - [`src/platformAccessory.ts`](./src/platformAccessory.ts) - one light: HomeKit characteristics, the
   commit queue and the notification parsing.
-- [`src/bufferHelper.ts`](./src/bufferHelper.ts) - the BLE frames (`4c 54 …` + CRC16/XMODEM).
+- [`src/bufferHelper.ts`](./src/bufferHelper.ts) - the BLE frames (`4c 54 …` + CRC16/XMODEM), the
+  light's registers and the parsing of its status report.
 - [`config.schema.json`](./config.schema.json) - what the Homebridge UI offers, see the
   [config schema documentation](https://developers.homebridge.io/#/config-schema).
 

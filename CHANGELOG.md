@@ -2,7 +2,7 @@
 
 All notable changes to this plugin are documented here.
 
-## Unreleased
+## 1.5.0
 
 ### Changed
 
@@ -31,6 +31,23 @@ All notable changes to this plugin are documented here.
   `unauthorized` after the next restart, without saying which file to allow.
   Granting it doesn't change the adapter state on its own, Homebridge has to
   be restarted.
+
+### Added
+
+- The channel selected on the light is logged when the light connects and
+  whenever it changes. The status report carries it in the byte that was
+  logged as `idonknowwhat`; the light's brightness and color temperature may
+  differ after a channel change, which the log now explains. Changing the
+  channel on the light drops the Bluetooth link, the plugin reconnects on its
+  own about a minute later.
+
+### Fixed
+
+- A notification with trailing bytes after a valid frame threw an exception
+  in the Bluetooth event handler: the header check only ever looked at the
+  first frame and the length check was off by one, so the parser read past the
+  end of the buffer. Every frame is now checked on its own, and a malformed one
+  is logged and dropped.
 
 ## 1.4.2
 
