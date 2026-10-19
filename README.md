@@ -10,13 +10,14 @@
 - Turn on/off the light
 - Set the brightness of the light
 - Set the color temperature of the light
+- Scenes: the GVM app's scenes are presets stored in the app that only set brightness and color
+  temperature, so HomeKit scenes do the same job
 
 ## Not Supported Features
-- Channel control: the channel selected on the light is shown in the log, but HomeKit has no way to
-  show or change it. Changing it on the light drops the Bluetooth link; the plugin reconnects on its own
-  about a minute later.
-- Scene control
-  
+- Channel control: the channel selected on the light is shown in the log, but HomeKit has no
+  characteristic to show or change it. The light accepts a channel change over Bluetooth (the GVM app
+  does that), the plugin just doesn't offer it. Changing the channel on the light itself drops the
+  Bluetooth link; the plugin reconnects on its own about a minute later.
 ## Usage
 - identify the id of your light, put it in the config file
 - or you have only one BLE light named `BT_LED`, you can use the default config file
@@ -84,7 +85,8 @@ both are optional and in milliseconds:
 
 
 ## Known Issues
-- Some communication protocal with the light is still unknown
+- A few messages of the light's protocol are still unknown, e.g. what the GVM app sends before applying
+  a scene. None of them is needed for the supported features.
 
 ## Version history
 see [CHANGELOG.md](./CHANGELOG.md)
