@@ -22,7 +22,7 @@
     "lintFix": "eslint src/**/*.ts --max-warnings=0 --fix",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
-    "test": "npm run build && node test/commit-order.mjs",
+    "test": "npm run build && node test/commit-order.mjs && node test/noble-lifecycle.mjs",
     "prepublishOnly": "npm run lint && npm test"
   },
   "keywords": [
@@ -42,7 +42,7 @@
     "typescript-eslint": "^8.4.0"
   },
   "dependencies": {
-    "@abandonware/noble": "^1.9.2-25",
+    "@stoprocent/noble": "^2.8.0",
     "crc": "^4.3.2"
   }
 }

@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { BleLights } from './platform.js';
-import { Characteristic, Peripheral } from '@abandonware/noble';
+import { Characteristic, DisconnectReason, Peripheral } from '@stoprocent/noble';
 import { CRCBuffer, onoff, start_with, brightness, temprature, infoAll } from './bufferHelper.js';
 import { delay, errorMessage, seconds, withTimeout } from './util.js';
 
@@ -135,7 +135,7 @@ export class GVMBleLightAccessory {
     this.accessory.context.id = peripheral.id;
 
     peripheral.removeAllListeners('disconnect');
-    peripheral.once('disconnect', (reason: string) => this.onDisconnected(reason));
+    peripheral.once('disconnect', (reason: DisconnectReason) => this.onDisconnected(reason));
 
     this.setStatus('connecting');
   }
@@ -200,7 +200,6 @@ export class GVMBleLightAccessory {
       }
     });
     await withTimeout(char.subscribeAsync(), timeout, `subscribe ${this.deviceId}`);
-    await withTimeout(char.notifyAsync(true), timeout, `notify ${this.deviceId}`);
     this.platform.log.info('Subscribed to peripheral characterisitics', this.deviceId);
 
     this.char = char;
@@ -212,9 +211,9 @@ export class GVMBleLightAccessory {
   private async abort(peripheral: Peripheral) {
     this.detachCharacteristic();
     try {
-      // settles the connect promise noble would otherwise leak. The macOS
-      // bindings don't implement cancelConnect and throw *after* the promise
-      // has been settled, so this must not prevent the disconnect below.
+      // settles the connect promise noble would otherwise leak and cancels a
+      // still pending OS connection. Only does something while `connecting`,
+      // and a binding that throws here must not prevent the disconnect below.
       peripheral.cancelConnect();
     } catch (err) {
       this.platform.log.debug('cancelConnect failed:', errorMessage(err));
@@ -223,6 +222,8 @@ export class GVMBleLightAccessory {
       // CoreBluetooth never times out a pending connect on its own. Unless it
       // is cancelled here it completes later behind our back, and a connected
       // light stops advertising - so it would never be discovered again.
+      // `cancelConnect()` marks a pending connect `disconnected` right away,
+      // so this covers a connect that completed or failed.
       if (peripheral.state !== 'disconnected') {
         await withTimeout(peripheral.disconnectAsync(), this.platform.timeout, `disconnect ${this.deviceId}`);
       }
@@ -231,13 +232,17 @@ export class GVMBleLightAccessory {
     }
   }
 
-  private onDisconnected(reason?: string) {
+  private onDisconnected(reason?: DisconnectReason) {
     this.platform.log.info('Peripherial disconnected:', this.deviceId);
     this.platform.log.debug('Reason:', reason);
     this.detachCharacteristic();
     this.setStatus('idle');
-    // being discovered again is what triggers the reconnect
-    void this.platform.startScanning();
+    // being discovered again is what triggers the reconnect. Deferred because
+    // noble emits `disconnect` for every peripheral *before* it reports the
+    // adapter leaving `poweredOn`: scanning right away would hit an adapter
+    // that is going down, and its `scanStart` would leave `scanning` set for
+    // a scan that never runs once the adapter is back.
+    setImmediate(() => void this.platform.startScanning());
   }
 
   /**

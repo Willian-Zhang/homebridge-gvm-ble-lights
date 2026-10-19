@@ -7,7 +7,11 @@ from the code and has already cost debugging time.
 ## Working on the code
 
 - `npm run build`, `npm run lint` (`--max-warnings=0`) and `npm test` must pass. The
-  tests don't need a light or an adapter.
+  tests don't need a light or an adapter; `test/noble-lifecycle.mjs` runs a light
+  against noble's real JS layer (`@stoprocent/noble/lib/noble.js`) on fake bindings.
+- The BLE library is `@stoprocent/noble` because it ships prebuilt binaries;
+  `@abandonware/noble` (used up to 1.4.2) was compiled with node-gyp on every install
+  and upgrade. Don't switch to a dependency that needs a compiler.
 - Every noble `*Async` call must be wrapped in `withTimeout()` from `src/util.ts`; they
   are promisified events that never settle if the event doesn't arrive.
 - Reconnection is driven by rediscovery: a handler that is `idle` waits for the
@@ -20,20 +24,25 @@ from the code and has already cost debugging time.
 
 ## Bluetooth / noble quirks (macOS)
 
-- `@abandonware/noble`'s macOS bindings do **not** implement `cancelConnect`.
-  `peripheral.cancelConnect()` settles the pending connect promise and then throws
-  `this._bindings.cancelConnect is not a function`. Never put it in the same `try` as
-  the disconnect that must follow it (see `abort()` in `src/platformAccessory.ts`).
 - CoreBluetooth never times out a pending `connectPeripheral`. If our own timeout fires
-  and the OS connection isn't cancelled via `disconnectAsync()`
-  (`cancelPeripheralConnection`), the connect completes later behind our back. A
-  connected GVM light stops advertising, so it is never discovered again - the plugin
-  scans forever and only a Homebridge restart or power-cycling the light helps.
-  The watchdog (`healthCheck()`) also releases an `idle` handler whose peripheral is
-  still `connected`/`connecting` at the OS level as a safety net.
+  and the OS connection isn't cancelled (`cancelPeripheralConnection`), the connect
+  completes later behind our back. A connected GVM light stops advertising, so it is
+  never discovered again - the plugin scans forever and only a Homebridge restart or
+  power-cycling the light helps. `peripheral.cancelConnect()` does the OS cancel and
+  marks the peripheral `disconnected` - but only while it is `connecting`, so `abort()`
+  in `src/platformAccessory.ts` still disconnects anything else. (`@abandonware/noble`'s
+  macOS bindings didn't implement `cancelConnect` at all and threw, which is why it
+  has its own `try`.) The watchdog (`healthCheck()`) also releases an `idle` handler
+  whose peripheral is still `connected`/`connecting` at the OS level as a safety net.
 - After the adapter reports `resetting`/`poweredOff`, every peripheral handle is dead
   and CoreBluetooth silently drops calls made on them. Don't disconnect them, just
-  `invalidate()` and wait for `poweredOn` (see `onAdapterStateChange`).
+  `invalidate()` and wait for `poweredOn` (see `onAdapterStateChange`). noble drops its
+  peripherals then (rediscovery creates new objects) and first emits `disconnect` for
+  each of them, *before* `stateChange` - so the plugin's own adapter state is still
+  `poweredOn` inside a `disconnect` handler. Anything that talks to the adapter from
+  there has to be deferred (see `onDisconnected()`).
+- noble's constructor installs a `warning` listener that `console.warn`s everything
+  outside of the Homebridge log; the platform replaces it with a debug log.
 - `scanning` is only set from noble's `scanStart`/`scanStop` events, never guessed.
   The one exception is `restartScanning()`: CoreBluetooth can stop scanning silently
   (seen after the Mac slept) and then no `scanStop` ever arrives, so the watchdog
@@ -55,6 +64,12 @@ from the code and has already cost debugging time.
   `stateChange`: Homebridge has to be restarted. With Full Disk Access for the terminal,
   `sqlite3 ~/Library/Application\ Support/com.apple.TCC/TCC.db "select client, auth_value
   from access where service='kTCCServiceBluetoothAlways'"` lists the grants (2 = allowed).
+  The service therefore runs the signed build at
+  `/Library/Application Support/Homebridge/node-x86_64/bin/node`, the layout hb-service's
+  Node.js updater supports. It has its own global prefix: install a test build into the
+  running Homebridge with *its* npm (`PATH="/Library/Application Support/Homebridge/node-x86_64/bin:$PATH"
+  npm install -g <tgz>`) - Homebrew's npm installs into `/usr/local/lib/node_modules`,
+  which the service doesn't load.
 - The lights write without response and drop what they can't keep up with; commands are
   paced and ordered (`On` first) - see the 1.4.0 changelog entry before touching the
   commit queue.

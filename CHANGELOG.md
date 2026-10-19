@@ -6,6 +6,22 @@ All notable changes to this plugin are documented here.
 
 ### Changed
 
+- Installing and upgrading the plugin no longer compiles anything. The BLE
+  library `@abandonware/noble` ships no prebuilt binaries, so every install ran
+  node-gyp on its native addon (about 30s of a 40s upgrade on a Mac, needing
+  Xcode command line tools), and on Linux its Bluetooth socket dependency was
+  built from source as well. It has been replaced by its maintained fork
+  `@stoprocent/noble`, which ships prebuilt binaries for macOS, Linux (x64, arm,
+  arm64) and Windows. Device ids are unchanged, so existing accessories and
+  configured `id`s keep working.
+
+  Two behaviour differences of the new library are handled: a pending connect
+  is now cancelled through its `cancelConnect` (which the old macOS bindings
+  lacked), and since it emits `disconnect` for every light *before* reporting
+  that the adapter went down, the rescan after a disconnect waits until the
+  adapter state is known. Otherwise a scan requested from a resetting adapter
+  left the plugin believing it was scanning, delaying the reconnect by up to
+  5 minutes until the stale-scan watchdog stepped in.
 - When Bluetooth access is denied, the log names the `node` binary that needs
   it and where to allow it, instead of "try add this app to the whitelist".
   Homebridge runs as a background service and never gets the macOS permission

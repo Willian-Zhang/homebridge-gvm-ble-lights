@@ -1,5 +1,5 @@
 import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
-import noble, { Peripheral } from '@abandonware/noble';
+import noble, { Peripheral } from '@stoprocent/noble';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { GVMBleLightAccessory } from './platformAccessory.js';
@@ -40,7 +40,7 @@ export class BleLights implements DynamicPlatformPlugin {
    */
   private readonly handlers: Map<string, GVMBleLightAccessory> = new Map();
 
-  private adapterState: string = noble._state;
+  private adapterState: string = 'unknown';
   private scanning = false;
   private scanRequest?: Promise<void>;
   /** when the current scan started or last produced a `discover` event */
@@ -121,6 +121,9 @@ export class BleLights implements DynamicPlatformPlugin {
     noble.on('stateChange', (state: string) => {
       this.onAdapterStateChange(state).catch((err) => this.log.error('Failed to handle adapter state:', errorMessage(err)));
     });
+    // only read after subscribing: the getter starts the bindings itself when
+    // nothing listens yet, and they may report their first state synchronously
+    this.adapterState = noble.state;
     noble.on('scanStart', () => {
       this.scanning = true;
       this.lastScanActivity = Date.now();
@@ -134,6 +137,9 @@ export class BleLights implements DynamicPlatformPlugin {
       this.lastScanActivity = Date.now();
       this.onDiscover(peripheral).catch((err) => this.log.error('Failed to handle discovered peripheral:', errorMessage(err)));
     });
+    // noble's own listener prints every warning straight to the console,
+    // outside of the Homebridge log - they only matter when debugging
+    noble.removeAllListeners('warning');
     noble.on('warning', (message: string) => this.log.debug('BLE warning:', message));
 
     this.log.debug('Finished initializing platform.');

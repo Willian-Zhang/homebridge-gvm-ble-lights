@@ -41,9 +41,9 @@ exapmle:
       [nodejs.org](https://nodejs.org) are signed by the Node.js Foundation, so the permission keeps
       covering updates installed at the same path.
   - linux:
-    - [check here](https://www.npmjs.com/package/@abandonware/noble#linux)
+    - [check here](https://www.npmjs.com/package/@stoprocent/noble#linux)
   - windows: 
-    - [check here](https://www.npmjs.com/package/@abandonware/noble#windows)
+    - [check here](https://www.npmjs.com/package/@stoprocent/noble#windows)
 
 
 ### mutiple devices
